@@ -33,20 +33,22 @@ Before running the bootstrap script:
 
 ## Phase 1A — quick start
 
+> ⚠️ **First-commit caveat**: for the very first push to an empty repo, push the scaffold **directly to `main`** (not a feature branch). GitHub needs `main` to exist before you can open PRs against it. All Phase 1B+ work uses the normal feature-branch → PR → merge flow.
+
 ```bash
 # 1. Run the one-time bootstrap (creates state SA + GitHub OIDC plumbing)
 chmod +x scripts/00-bootstrap-state.sh
 ./scripts/00-bootstrap-state.sh
 
-# 2. Commit + push to a feature branch
-git checkout -b infra/01-bootstrap
+# 2. Push the scaffold directly to main (first commit only)
+git checkout -b main
 git add .
 git commit -m "chore: scaffold repo with bootstrap, providers, and hello-world workflow"
-git push -u origin infra/01-bootstrap
+git push -u origin main
 
-# 3. Open a PR — the hello-world workflow should turn green within ~60 seconds.
-gh pr create --fill
-gh pr view --web
+# 3. Trigger the OIDC smoke test manually
+gh workflow run hello-world.yml --ref main
+gh run watch $(gh run list --workflow=hello-world.yml --limit 1 --json databaseId --jq '.[0].databaseId') --exit-status
 ```
 
 When the workflow goes green, you've proven GitHub → Azure auth works **with zero secrets**. That's the Phase 1A win.

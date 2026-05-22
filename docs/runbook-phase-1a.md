@@ -62,54 +62,60 @@ gh secret list --repo tonzking123/dsolab   # should print nothing
 
 ## Step 3 — Commit and push the scaffold
 
+> ⚠️ **First-commit caveat**: an empty GitHub repo has no `main` branch yet. If you push a feature branch first, GitHub auto-sets it as the default branch and you can't open a PR (base == head). For the **initial scaffold only**, push directly to `main`. From Phase 1B onward, all changes go through feature-branch → PR → merge.
+
 ```bash
-git checkout -b infra/01-bootstrap
+git checkout -b main
 git add .
 git status   # review what's about to be committed — should NOT include any state files or .env
 
 git commit -m "chore: scaffold repo with bootstrap, providers, and hello-world workflow"
-git push -u origin infra/01-bootstrap
+git push -u origin main
 ```
 
 > **Common gotcha**: if `git status` shows `terraform/envs/lab/terraform.tfstate` or similar, your `.gitignore` is not working — verify it's in the repo root and contains the Terraform rules.
 
-## Step 4 — Open a PR and watch the workflow
+## Step 4 — Trigger the OIDC smoke test on `main`
+
+Since we pushed direct to `main`, there's no PR. Trigger the workflow manually:
 
 ```bash
-gh pr create --fill --title "infra/01: bootstrap repo + OIDC smoke test"
-gh pr view --web
+gh workflow run hello-world.yml --ref main
+sleep 5
+gh run watch $(gh run list --workflow=hello-world.yml --limit 1 --json databaseId --jq '.[0].databaseId') --exit-status
 ```
 
-On the PR page → **Checks** tab → `Hello World (OIDC smoke test)` should run and turn green within ~60 seconds.
+Expected output: workflow completes with `success`. From Phase 1B onward, this workflow will also auto-run on every PR that touches it.
 
-**Click into the workflow run** to see the output:
-- The "Azure login via OIDC" step uses NO secrets — just the OIDC token exchange between GitHub and Entra.
-- The "Confirm identity" step prints your subscription name, ID, tenant, and the identity used (which should be `mi-gha-dsolab`'s service principal name).
-- The sanity-check step lists your lab resource group.
+## Step 5 — Recover if you accidentally pushed to a feature branch first
 
-## Step 5 — Merge
+If you ran `git checkout -b infra/01-bootstrap` + `git push -u origin infra/01-bootstrap` before reading this, you'll get exit code 1 from `gh pr create` with no useful error. Fix:
 
 ```bash
-gh pr merge --squash --delete-branch
+# Rename your feature branch to main locally + push as main + set default + clean up
+git branch -m infra/01-bootstrap main
+git push -u origin main
+gh repo edit tonzking123/dsolab --default-branch main
+git push origin --delete infra/01-bootstrap
+gh workflow run hello-world.yml --ref main
 ```
 
-The same workflow runs again on `main` after merge — should also be green.
 
 ## Phase 1A exit criteria
 
 ```bash
-# 1. Workflow ran green on the PR and on main
-gh run list --workflow="hello-world.yml" --limit 2
-#    Expected: 2 rows, both "completed success"
+# 1. Workflow ran green on main
+gh run list --workflow="hello-world.yml" --limit 1
+#    Expected: 1 row, "completed success"
 
 # 2. No secrets in the repo
 gh secret list --repo tonzking123/dsolab
 #    Expected: empty (only variables are set, which is fine)
 
-# 3. main has the merge commit
+# 3. main is the default branch and has the scaffold
 git checkout main && git pull
 git log --oneline -3
-#    Expected: top commit is your merged scaffold
+#    Expected: top commit is your scaffold
 
 # 4. Local terraform init works
 terraform -chdir=terraform/envs/lab init \
@@ -136,6 +142,7 @@ terraform -chdir=terraform/envs/lab plan
 | `terraform init` says "Failed to get existing workspaces" with 403 | You don't have Blob Data Contributor on the container | The bootstrap script grants it to your user; re-run the script, or assign manually via portal |
 | Bootstrap script exits with "repo not found" | Repo not created on GitHub yet | `gh repo create tonzking123/dsolab --private --confirm` |
 | Bootstrap script exits with "Insufficient privileges" on role assignment | You don't have Owner / UAA on the subscription | Escalate via PIM, or ask sub owner to run the script |
+| `gh pr create --fill` exits code 1 silently | First push went to a feature branch on an empty repo — `main` doesn't exist, default branch is your feature branch, base == head | See Step 5 above: rename feature branch to `main`, push, set default, delete old branch |
 
 ## What's next
 
