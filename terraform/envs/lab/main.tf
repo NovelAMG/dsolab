@@ -38,16 +38,11 @@ module "keyvault" {
   location            = var.location_primary
   resource_group_name = data.azurerm_resource_group.lab.name
   tenant_id           = data.azurerm_client_config.current.tenant_id
+  tags                = var.tags
 
-  # Grant KV Administrator to BOTH the TF runner (GHA MI in CI, your user locally)
-  # AND the designated human admin from var.human_admin_object_id. distinct() de-dups
-  # if you happen to be the runner; compact() drops nulls if human_admin_object_id is unset.
-  admin_principal_object_ids = distinct(compact([
-    data.azurerm_client_config.current.object_id,
-    var.human_admin_object_id,
-  ]))
-
-  tags = var.tags
+  # KV admin role assignments are bootstrap-managed (see scripts/00-bootstrap-state.sh
+  # and ADR 0008). The GHA MI + human admin are granted Key Vault Administrator at
+  # RG scope by the bootstrap script, which covers any KV in this RG.
 }
 
 # ───── Runtime ─────

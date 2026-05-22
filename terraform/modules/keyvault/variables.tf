@@ -18,11 +18,6 @@ variable "tenant_id" {
   type        = string
 }
 
-variable "admin_principal_object_ids" {
-  description = "Object IDs of principals to grant Key Vault Administrator (both TF runner and human admin)"
-  type        = list(string)
-}
-
 variable "tags" {
   description = "Tags"
   type        = map(string)
