@@ -28,6 +28,12 @@
 - [ ] Phase 1A merged on `main` (workflow `Hello World (OIDC smoke test)` is green)
 - [ ] `gh variable list --repo tonzking123/dsolab` shows 7 variables
 - [ ] Your $200/mo budget alert is set in Azure Cost Management
+- [ ] **One-time: register Azure Resource Providers** (your account, not CI):
+  ```bash
+  chmod +x scripts/01-register-resource-providers.sh
+  ./scripts/01-register-resource-providers.sh
+  ```
+  This runs once per subscription. The GitHub Actions MI cannot register RPs itself (it's scoped to the RG, not the subscription), so we pre-register the 13 RPs we actually use. The script is idempotent.
 
 ## Step 1 — Pull main and create the feature branch
 

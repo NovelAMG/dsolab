@@ -20,6 +20,12 @@ terraform {
 }
 
 provider "azurerm" {
+  # Skip auto-registration of Azure Resource Providers. The GitHub Actions MI
+  # has Contributor scoped to the resource group, not the subscription — so it
+  # cannot register RPs at /subscriptions/ scope. Pre-register the needed RPs
+  # manually via scripts/01-register-resource-providers.sh (one-time, as Owner).
+  resource_provider_registrations = "none"
+
   features {
     resource_group {
       prevent_deletion_if_contains_resources = false # lab: easy teardown
