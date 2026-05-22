@@ -1,0 +1,44 @@
+name: Hello World (OIDC smoke test)
+
+# Triggers:
+#   - any push to main that touches this workflow file
+#   - any PR that touches this workflow file
+#   - manual dispatch (Actions tab → Run workflow)
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/hello-world.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/hello-world.yml'
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # required for OIDC token exchange
+  contents: read
+
+jobs:
+  hello:
+    name: Verify Azure OIDC login (no secrets)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Azure login via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Confirm identity
+        run: |
+          echo "✓ Authenticated to Azure without any client secret."
+          echo ""
+          echo "── Subscription details ──"
+          az account show --query '{subscription:name, id:id, tenantId:tenantId}' -o table
+          echo ""
+          echo "── Identity used ──"
+          az account show --query 'user.name' -o tsv
+          echo ""
+          echo "── Sanity check: list the lab resource group ──"
+          az group show --name "${{ vars.TF_STATE_RG }}" --query '{name:name, location:location, tags:tags}' -o jsonc

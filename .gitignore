@@ -1,0 +1,44 @@
+# Terraform
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+.terraform/
+terraform.tfvars
+*.auto.tfvars
+backend.hcl
+backend.tfvars
+crash.log
+crash.*.log
+# Note: .terraform.lock.hcl IS committed (reproducibility)
+
+# Node / SPA
+node_modules/
+dist/
+build/
+.next/
+.cache/
+*.log
+npm-debug.log*
+yarn-error.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Lab artifacts (kubeconfigs, generated files)
+*.kubeconfig
+kubeconfig
+.azure/
+.kube/

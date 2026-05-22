@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DevSecOps Lab — SPA + n8n + Azure OpenAI on AKS</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true, theme:'dark'});</script>
+<style>
+:root {
+  --bg: #0f1419; --panel: #161b22; --panel-2: #1f2733; --text: #e6edf3;
+  --muted: #8b949e; --accent: #58a6ff; --accent-2: #7ee787; --warn: #f0883e;
+  --danger: #ff7b72; --border: #30363d; --code-bg: #0d1117;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #ffffff; --panel: #f6f8fa; --panel-2: #eaeef2; --text: #1f2328;
+    --muted: #656d76; --accent: #0969da; --accent-2: #1a7f37; --warn: #bc4c00;
+    --danger: #cf222e; --border: #d0d7de; --code-bg: #f6f8fa;
+  }
+}
+* { box-sizing: border-box; }
+html, body { background: var(--bg); color: var(--text); margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  font-size: 15px; line-height: 1.6;
+  display: grid; grid-template-columns: 280px 1fr; max-width: 1400px; margin: 0 auto;
+}
+nav.toc {
+  position: sticky; top: 0; align-self: start; height: 100vh; overflow-y: auto;
+  padding: 24px 16px; border-right: 1px solid var(--border); background: var(--panel);
+}
+nav.toc h2 { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 12px; }
+nav.toc ol { list-style: none; padding: 0; margin: 0; counter-reset: toc; }
+nav.toc li { counter-increment: toc; margin: 4px 0; }
+nav.toc li::before { content: counter(toc) ". "; color: var(--muted); }
+nav.toc a { color: var(--text); text-decoration: none; }
+nav.toc a:hover { color: var(--accent); }
+nav.toc ol ol { margin-left: 16px; counter-reset: toc-sub; }
+nav.toc ol ol li { counter-increment: toc-sub; font-size: 13px; }
+nav.toc ol ol li::before { content: counter(toc) "." counter(toc-sub) " "; }
+main { padding: 32px 48px; max-width: 1000px; }
+h1 { font-size: 28px; margin: 0 0 8px; }
+h2 { font-size: 22px; margin: 40px 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); color: var(--accent); }
+h3 { font-size: 17px; margin: 24px 0 8px; color: var(--accent-2); }
+h4 { font-size: 15px; margin: 16px 0 8px; }
+p { margin: 8px 0; }
+.subtitle { color: var(--muted); margin-bottom: 24px; }
+code { background: var(--code-bg); padding: 2px 6px; border-radius: 4px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 13px; color: var(--accent-2); }
+pre { background: var(--code-bg); padding: 12px; border-radius: 6px; overflow-x: auto; border: 1px solid var(--border); }
+pre code { background: none; padding: 0; color: var(--text); }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
+th, td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; vertical-align: top; }
+th { background: var(--panel-2); font-weight: 600; }
+tr:nth-child(even) td { background: var(--panel); }
+ul, ol { padding-left: 24px; }
+li { margin: 4px 0; }
+.callout { background: var(--panel); border-left: 4px solid var(--accent); padding: 12px 16px; border-radius: 4px; margin: 16px 0; }
+.phase { background: var(--panel); padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: 600; color: var(--accent); border: 1px solid var(--accent); display: inline-block; }
+.label { display: inline-block; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; padding: 2px 8px; border-radius: 3px; margin-right: 6px; }
+.label-do { background: rgba(88,166,255,0.15); color: var(--accent); }
+.label-git { background: rgba(126,231,135,0.15); color: var(--accent-2); }
+.label-verify { background: rgba(240,136,62,0.15); color: var(--warn); }
+.label-why { background: rgba(255,123,114,0.15); color: var(--danger); }
+.label-gotcha { background: rgba(139,148,158,0.2); color: var(--muted); }
+.task-block { background: var(--panel); padding: 16px; border-radius: 6px; margin: 12px 0; border: 1px solid var(--border); }
+.task-block p { margin: 6px 0; }
+.mermaid { background: var(--panel); padding: 16px; border-radius: 6px; margin: 16px 0; text-align: center; }
+hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+.tag-set { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.tag { background: var(--panel-2); padding: 2px 8px; border-radius: 3px; font-size: 12px; color: var(--muted); }
+@media (max-width: 900px) {
+  body { grid-template-columns: 1fr; }
+  nav.toc { position: static; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+  main { padding: 16px; }
+}
+@media print {
+  nav.toc { display: none; }
+  body { grid-template-columns: 1fr; }
+  main { padding: 0; }
+  h2 { page-break-before: always; }
+  .task-block { page-break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+
+<nav class="toc">
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="#overview">Overview</a></li>
+    <li><a href="#params">Lab parameters</a></li>
+    <li><a href="#mental-model">Attack lifecycle</a></li>
+    <li><a href="#architecture">Architecture</a></li>
+    <li><a href="#inventory">Inventory</a></li>
+    <li><a href="#ownership">Ownership model</a></li>
+    <li><a href="#phase-0">Phase 0 — Foundations</a></li>
+    <li><a href="#phase-1">Phase 1 — Pure DevOps</a>
+      <ol>
+        <li><a href="#p1a">1A. Bootstrap + OIDC</a></li>
+        <li><a href="#p1b">1B. Core infra</a></li>
+        <li><a href="#p1c">1C. Defender posture</a></li>
+        <li><a href="#p1d">1D. Identity + Entra</a></li>
+        <li><a href="#p1e">1E. App deployment</a></li>
+        <li><a href="#p1f">1F. Token flow + smoke</a></li>
+      </ol>
+    </li>
+    <li><a href="#phase-2">Phase 2 — Shift-left</a></li>
+    <li><a href="#phase-3">Phase 3 — Cluster & runtime</a></li>
+    <li><a href="#phase-4">Phase 4 — Identity & AI SPM</a></li>
+    <li><a href="#phase-5">Phase 5 — Detonate CVE</a></li>
+    <li><a href="#phase-6">Phase 6 — Monitoring</a></li>
+    <li><a href="#decisions">Decisions</a></li>
+    <li><a href="#open">Open decisions</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<h1 id="overview">DevSecOps Lab — SPA + n8n + Azure OpenAI on AKS</h1>
+<p class="subtitle">Entra-auth only · Phased learning lab from "no DevOps" to fully instrumented DevSecOps pipeline.</p>
+
+<p>Phase 1 builds a working pipeline with <strong>zero security gates</strong> (pure DevOps muscle memory). Phases 2–5 progressively layer in GHAS (shift-left), Defender for Containers (runtime), Defender for AI Services + Purview DSPM (AI SPM), and Conditional Access. Phase 5 detonates <strong>CVE-2025-68613 (n8n authenticated RCE)</strong> in an isolated namespace to validate every detection layer end-to-end.</p>
+
+<div class="tag-set">
+  <span class="tag">AKS only</span>
+  <span class="tag">GitHub Actions + OIDC (no secrets)</span>
+  <span class="tag">Terraform (azurerm + azuread + azapi)</span>
+  <span class="tag">Azure OpenAI Entra-only (disableLocalAuth)</span>
+  <span class="tag">oauth2-proxy at ingress</span>
+  <span class="tag">Workload Identity for AOAI tokens</span>
+</div>
+
+<div class="callout">
+  <strong>Defender posture for Phase 1:</strong> plan stays enabled at the subscription level (agentless image scan + posture recommendations are free signals). The <strong>Defender sensor DaemonSet</strong> and <strong>Azure Policy for Kubernetes add-on</strong> are <strong>explicitly disabled</strong> in Defender for Containers → Settings until Phase 3 so the cluster stays clean for the DevOps learning phase. Re-enable deliberately in Phase 3 as the "now I want runtime threat detection" milestone.
+</div>
+
+<div class="callout">
+  <strong>Teaching contract:</strong> every Phase 1+ task uses five labels — <span class="label label-do">Do</span> <span class="label label-git">Git</span> <span class="label label-verify">Verify</span> <span class="label label-why">Why</span> <span class="label label-gotcha">Gotcha</span>. Git convention: branch per task (<code>&lt;type&gt;/&lt;slug&gt;</code>), Conventional Commits (<code>&lt;type&gt;(&lt;scope&gt;): &lt;subject&gt;</code>), PR per branch, self-merge in Phase 1 (branch protection enforces gates in Phase 2+).
+</div>
+
+<h2 id="params">Lab parameters (locked)</h2>
+<table>
+<thead><tr><th>Item</th><th>Value</th></tr></thead>
+<tbody>
+<tr><td>AKS region</td><td><code>southeastasia</code></td></tr>
+<tr><td>AOAI region</td><td><code>australiaeast</code> (split for GPT-4o availability)</td></tr>
+<tr><td>GitHub repo</td><td><code>tonzking123/dsolab</code></td></tr>
+<tr><td>OIDC FIC subjects</td><td><code>repo:tonzking123/dsolab:ref:refs/heads/main</code> and <code>repo:tonzking123/dsolab:pull_request</code></td></tr>
+<tr><td>Naming prefix</td><td><code>dsolab</code></td></tr>
+<tr><td>Resource group</td><td><code>rg-dsolab-sea</code></td></tr>
+<tr><td>AKS cluster</td><td><code>aks-dsolab-sea</code></td></tr>
+<tr><td>ACR</td><td><code>acrdsolab&lt;random&gt;</code></td></tr>
+<tr><td>Key Vault</td><td><code>kv-dsolab-sea</code></td></tr>
+<tr><td>Log Analytics</td><td><code>log-dsolab-sea</code></td></tr>
+<tr><td>AOAI account</td><td><code>aoai-dsolab-aue</code></td></tr>
+<tr><td>Postgres Flex</td><td><code>psql-dsolab-sea</code></td></tr>
+<tr><td>TF state SA</td><td><code>stdsolabtfstate&lt;random&gt;</code></td></tr>
+<tr><td>GH Actions MI</td><td><code>mi-gha-dsolab</code></td></tr>
+<tr><td>n8n workload MI</td><td><code>mi-n8n-aoai-dsolab</code></td></tr>
+<tr><td>SPA app reg</td><td><code>spa-dsolab</code></td></tr>
+<tr><td>n8n API app reg</td><td><code>n8n-api-dsolab</code> (App ID URI <code>api://n8n-dsolab</code>)</td></tr>
+<tr><td>Lab FQDN</td><td><code>chat.&lt;ingress-IP&gt;.nip.io</code> (no DNS to manage)</td></tr>
+</tbody>
+</table>
+
+<h2 id="mental-model">Mental model — container supply-chain attack lifecycle</h2>
+<p>Every phase maps to one stage of the attack lifecycle. When you finish, you'll have a defense at each stage.</p>
+
+<table>
+<thead><tr><th>Attack stage</th><th>Attacker action</th><th>Defense in this lab</th><th>Phase</th></tr></thead>
+<tbody>
+<tr><td><strong>Code</strong> — supply chain</td><td>Malicious code in image deps or app deps (typosquat, dep confusion, compromised maintainer)</td><td>GHAS Dependabot + dep review + CodeQL; Defender for DevOps posture finds risky repo settings</td><td><strong>2A.1, 2B</strong></td></tr>
+<tr><td><strong>Build</strong> — poisoning CI/CD</td><td>Plant malware in workflow steps; steal CI secrets; abuse self-hosted runners</td><td>OIDC (no secrets) + branch protection + signed commits + Defender for DevOps posture</td><td><strong>1A, 2A.1, 2B</strong></td></tr>
+<tr><td><strong>Ship</strong> — artifact tampering</td><td>Modify/replace images in registries; swap tags; MITM on pull</td><td>cosign keyless + SBOM + Defender for Containers registry scan + ACR private endpoint</td><td><strong>2E, 3.3</strong></td></tr>
+<tr><td><strong>Deployment</strong> — misconfiguration</td><td>Privileged pods, hostPath mounts, secrets in env, missing NetworkPolicy</td><td>Pod Security Admission restricted + KV CSI + NetworkPolicy + Ratify + AFD + WAF</td><td><strong>3.2, 3.3</strong></td></tr>
+<tr><td><strong>Runtime</strong> — vulnerable app</td><td>Exploit a known CVE; reverse shell; container escape; abuse workload identity</td><td>Defender for Containers DaemonSet + drift protection + CA on workload identity + Defender for AI + MSEM attack-path</td><td><strong>3, 4, 5, 6</strong></td></tr>
+</tbody>
+</table>
+<p>Phase 5 (CVE-2025-68613 detonation) deliberately walks an attacker down all 5 stages so you can score the defenses end-to-end.</p>
+
+<h2 id="architecture">Architecture</h2>
+<div class="mermaid">
+flowchart LR
+    U[User Browser<br/>SPA + MSAL] -->|1. Sign in| EID[Entra ID]
+    U -->|2. POST /chat<br/>bearer for n8n API| OP[oauth2-proxy<br/>at ingress]
+    OP -->|3. validates token<br/>injects X-Auth-* headers| N8N[n8n on AKS]
+    N8N -->|4. fetch AOAI token<br/>via workload identity FIC| EID
+    EID -->|access_token| N8N
+    N8N -->|5. Bearer + user=OID<br/>in request body| AOAI[Azure OpenAI<br/>disableLocalAuth=true]
+    N8N -->|6. response| U
+</div>
+
+<ul>
+  <li>User → SPA (Entra MSAL) → bearer token for the <strong>n8n API app reg</strong> → <strong>oauth2-proxy</strong> validates and injects <code>X-Auth-*</code> headers → n8n.</li>
+  <li>n8n pod uses <strong>Azure Workload Identity</strong> to fetch its own Entra token for <code>cognitiveservices.azure.com/.default</code>, then calls Azure OpenAI with <code>Authorization: Bearer &lt;token&gt;</code>.</li>
+  <li><strong>Azure OpenAI has <code>disableLocalAuth: true</code></strong> in Terraform — no API key exists, ever.</li>
+  <li>End-user context for Defender for AI attribution: <code>user</code> field in OpenAI body = OID from oauth2-proxy.</li>
+</ul>
+
+<h2 id="inventory">Component & identity inventory</h2>
+<table>
+<thead><tr><th>Component</th><th>Hosting</th><th>Identity</th><th>Talks to</th></tr></thead>
+<tbody>
+<tr><td>SPA (chat UI)</td><td>AKS Deployment or SWA</td><td>SPA app reg (PKCE)</td><td>n8n via oauth2-proxy</td></tr>
+<tr><td>oauth2-proxy</td><td>Separate Deployment in n8n ns</td><td>n8n API app reg</td><td>Validates SPA tokens; forwards to n8n</td></tr>
+<tr><td>n8n</td><td>AKS Deployment</td><td>SA <code>n8n</code> → workload identity → MI <code>mi-n8n-aoai</code></td><td>Azure OpenAI, Postgres, KV (CSI)</td></tr>
+<tr><td>Postgres Flex</td><td>Azure PaaS</td><td>Entra admin + password from KV</td><td>n8n</td></tr>
+<tr><td>Azure OpenAI</td><td>Azure PaaS</td><td><code>disableLocalAuth: true</code>; Entra callers</td><td>n8n (caller)</td></tr>
+<tr><td>ACR</td><td>Azure PaaS</td><td>AKS kubelet via MI (AcrPull)</td><td>AKS image pulls</td></tr>
+</tbody>
+</table>
+<p><strong>Two app regs only</strong>: (1) <strong>n8n API</strong> with scope <code>access_as_user</code>. (2) <strong>SPA</strong> public client with delegated perm.</p>
+<p><strong>One workload identity</strong> (<code>mi-n8n-aoai</code>): FIC <code>system:serviceaccount:n8n:n8n</code>; RBAC <code>Cognitive Services OpenAI User</code> on AOAI.</p>
+<p><strong>No Global Admin ever required</strong> — Application Administrator is enough.</p>
+
+<h2 id="ownership">Ownership model</h2>
+<table>
+<thead><tr><th>Concept layer</th><th>Security hat</th><th>Dev hat</th></tr></thead>
+<tbody>
+<tr><td>Enable GHAS + branch protection</td><td>✅</td><td>—</td></tr>
+<tr><td>Set up Defender for DevOps connector</td><td>✅</td><td>—</td></tr>
+<tr><td>Enable Defender plans + posture policies</td><td>✅</td><td>—</td></tr>
+<tr><td>Configure scanner thresholds</td><td>✅</td><td>—</td></tr>
+<tr><td>Manage admission controllers (Phase 3)</td><td>✅</td><td>—</td></tr>
+<tr><td>Manage Conditional Access (Phase 4)</td><td>✅</td><td>—</td></tr>
+<tr><td>Triage all findings</td><td>✅</td><td>—</td></tr>
+<tr><td>Write app code (SPA, n8n workflows)</td><td>—</td><td>✅</td></tr>
+<tr><td>Write Terraform + K8s manifests</td><td>—</td><td>✅ (with security review)</td></tr>
+<tr><td>Maintain ~14 lines of scanner steps in CI</td><td>—</td><td>✅ (security wrote the recipe)</td></tr>
+<tr><td>Fix findings (bump versions, fix code)</td><td>—</td><td>✅</td></tr>
+</tbody>
+</table>
+<p><strong>Total dev-visible YAML across the whole DevSecOps stack: ~14 lines.</strong> Everything else lives in Azure portal or repo settings.</p>
+
+<h2 id="phase-0">Phase 0 — Foundations</h2>
+<ol>
+  <li><strong>Azure subscription</strong> with quota for AKS, AOAI (GPT-4o), Postgres Flex, KV, ACR, LA, AFD.</li>
+  <li><strong>Tenant role</strong>: Application Administrator (NOT Global Admin). Activate via PIM.</li>
+  <li><strong>GHAS-enabled private repo</strong> on GitHub.</li>
+  <li><strong>Tooling local</strong>: <code>az</code> ≥ 2.60, <code>kubectl</code>, <code>helm</code>, <code>docker</code>, <code>gh</code>, Node 20+, <code>cosign</code>, <code>syft</code>, <code>terraform</code>.</li>
+  <li><strong>Cost guardrail</strong>: Azure budget alert (~$200/mo) before provisioning.</li>
+  <li><strong>Decision log</strong>: <code>docs/decisions/</code> ADRs in the repo.</li>
+</ol>
+<p><strong>Verify</strong>: <code>az login</code>, <code>gh auth login</code> succeed; PIM activation works; budget alert test-fires.</p>
+
+<h2 id="phase-1">Phase 1 — Pure DevOps <span class="phase">no security gates</span></h2>
+<p>Goal: working SPA → oauth2-proxy → n8n → Azure OpenAI on AKS, deployed by GitHub Actions. <strong>Split into 6 PR-sized sub-phases.</strong></p>
+
+<div class="task-block" id="p1a">
+<h3>1A. Repo + Terraform remote state + GitHub→Azure OIDC</h3>
+<p><span class="label label-do">Do</span> Create private repo; add <code>.gitignore</code>, <code>README.md</code>, <code>terraform/envs/lab/</code>, <code>terraform/modules/</code>, <code>docs/decisions/</code>; create storage account + container for TF state (via <code>az cli</code>); create user-assigned MI for GitHub Actions; add federated credentials for <code>refs/heads/main</code> + <code>pull_request</code>; assign MI <code>Contributor</code> on lab RG + <code>Storage Blob Data Contributor</code> on state container; write <code>hello-world.yml</code> workflow with OIDC login + <code>az account show</code>.</p>
+<p><span class="label label-git">Git</span> Branch <code>infra/01-bootstrap</code>. Commits: <code>chore: scaffold repo</code>, <code>infra(state): add tf azure backend</code>, <code>ci: github oidc to azure</code>. One PR.</p>
+<p><span class="label label-verify">Verify</span> Actions tab → workflow green; logs print subscription ID; <code>gh secret list</code> empty.</p>
+<p><span class="label label-why">Why</span> Long-lived service principal secrets in GitHub are the #1 enterprise cloud breach vector. OIDC eliminates them.</p>
+<p><span class="label label-gotcha">Gotcha</span> Federated credential subject string must match exactly (<code>refs/heads/main</code>, not <code>main</code>).</p>
+</div>
+
+<div class="task-block" id="p1b">
+<h3>1B. Core Azure infra (Terraform)</h3>
+<p><span class="label label-do">Do</span> TF modules for AKS (workload identity + OIDC issuer ON), ACR + AKS AcrPull, KV (RBAC empty), LA, <strong>AOAI with <code>local_auth_enabled = false</code></strong> + GPT-4o deployment, Postgres Flex Burstable B1ms (Entra admin = you). CI runs <code>fmt -check</code> + <code>validate</code> + <code>plan</code> on PR (posts as comment); <code>apply</code> after merge.</p>
+<p><span class="label label-git">Git</span> Branch <code>infra/02-core-resources</code>. Commits: <code>infra(aks): add aks module</code>, <code>infra(aoai): add openai with disable-local-auth</code>, <code>infra(db): add postgres flex</code>, <code>ci: add tf plan and apply workflows</code>. PR.</p>
+<p><span class="label label-verify">Verify</span> PR shows bot-posted plan → review line-by-line; merge → <code>apply</code> green; <code>az cognitiveservices account keys list</code> says "local authentication disabled".</p>
+<p><span class="label label-why">Why</span> Reviewing a TF plan in a PR is <em>the</em> DevSecOps moment for IaC.</p>
+<p><span class="label label-gotcha">Gotcha</span> AOAI quota is regional + per-subscription. Request via Azure portal → Quotas before retrying.</p>
+</div>
+
+<div class="task-block" id="p1c">
+<h3>1C. Defender posture decision (docs-only PR)</h3>
+<p><span class="label label-do">Do</span> Defender for Cloud → Environment settings → Defender for Containers → Settings → toggle <strong>Defender sensor</strong> OFF, <strong>Azure Policy for Kubernetes</strong> OFF. Keep agentless image scan + CSPM ON. Write ADR.</p>
+<p><span class="label label-git">Git</span> Branch <code>docs/03-defer-defender-sensor</code>. Commit: <code>docs(decisions): adr-0001 defer defender sensor to phase 3</code>. PR.</p>
+<p><span class="label label-verify">Verify</span> Plan page Containers <strong>On</strong>, sub-components Off; <code>kubectl get ds -A</code> shows no <code>microsoft-defender-collector*</code> DaemonSet.</p>
+<p><span class="label label-why">Why</span> Knowing what your security tooling auto-installs is a real operational concern.</p>
+<p><span class="label label-gotcha">Gotcha</span> If sensor already deployed before toggling off, <code>kubectl delete</code> manually OR recreate cluster.</p>
+</div>
+
+<div class="task-block" id="p1d">
+<h3>1D. Workload identity + Entra app registrations</h3>
+<p><span class="label label-do">Do</span> TF creates MI <code>mi-n8n-aoai</code>, FIC <code>system:serviceaccount:n8n:n8n</code> against AKS OIDC issuer, role assignment <code>Cognitive Services OpenAI User</code> on AOAI. Two app regs via <code>azuread</code>: <code>spa-lab</code> (SPA, PKCE) and <code>n8n-api-lab</code> (API scope <code>access_as_user</code>, App ID URI <code>api://n8n-lab</code>); SPA gets delegated perm + admin consent.</p>
+<p><span class="label label-git">Git</span> Branch <code>infra/04-identity</code>. Commits: <code>infra(identity): add n8n workload identity</code>, <code>infra(entra): add spa and n8n-api app regs</code>. PR.</p>
+<p><span class="label label-verify">Verify</span> <code>az identity federated-credential list</code> shows FIC; both app regs exist; spa-lab → API permissions shows "Granted for tenant" ✓.</p>
+<p><span class="label label-why">Why</span> Federated credentials are the K8s equivalent of OIDC-to-GitHub: no stored secret.</p>
+<p><span class="label label-gotcha">Gotcha</span> K8s SA doesn't exist yet — FIC binding only activates once SA + workload identity webhook are in place (1E).</p>
+</div>
+
+<div class="task-block" id="p1e">
+<h3>1E. App deployment — n8n + oauth2-proxy + SPA + ingress</h3>
+<p><span class="label label-do">Do</span> <code>k8s/base/</code>: namespace <code>n8n</code>, SA <code>n8n</code> (annotated with MI client-id), Postgres Secret (inline), n8n Deployment + Service + PVC (Azure Files), oauth2-proxy Deployment + Service, SPA Deployment + Service, NGINX Ingress + cert-manager + Let's Encrypt staging, Ingress routing. CI: <code>kubectl apply -k k8s/overlays/lab/</code>.</p>
+<p><span class="label label-git">Git</span> Branch <code>feat/05-app-deploy</code>. Commits: <code>feat(k8s): add n8n base manifests</code>, <code>feat(k8s): add oauth2-proxy in front of n8n</code>, <code>feat(spa): add msal-based spa</code>, <code>feat(ingress): add nginx + cert-manager</code>, <code>ci: add kubectl apply step</code>. PR.</p>
+<p><span class="label label-verify">Verify</span> <code>kubectl get pods -n n8n</code> all Running; <code>curl -I https://&lt;fqdn&gt;/</code> returns 200 with LE cert; browser to <code>/spa</code> shows login button → Entra popup.</p>
+<p><span class="label label-why">Why</span> oauth2-proxy does what most enterprises bolt on as "API gateway" — auth at the edge so the app doesn't have to.</p>
+<p><span class="label label-gotcha">Gotcha</span> cert-manager needs DNS resolving to ingress IP <em>before</em> Let's Encrypt issues. Use Azure DNS A record OR start with self-signed issuer.</p>
+</div>
+
+<div class="task-block" id="p1f">
+<h3>1F. Token flow + golden smoke test</h3>
+<p><span class="label label-do">Do</span> In n8n UI: sub-workflow <code>Get AOAI Token</code> — Code node reads <code>/var/run/secrets/azure/tokens/azure-identity-token</code> → HTTP Request to <code>login.microsoftonline.com/&lt;tenant&gt;/oauth2/v2.0/token</code> with FIC client assertion → returns <code>access_token</code> (cached in <code>workflowStaticData</code>). Main <code>chat</code> workflow: Webhook → reads <code>X-Auth-Request-User</code> → calls sub-workflow → POST to AOAI with <code>Authorization: Bearer {{token}}</code> + <code>"user": "{{oid}}"</code>. Export JSON to <code>n8n/workflows/</code>.</p>
+<p><span class="label label-git">Git</span> Branch <code>feat/06-aoai-token-flow</code>. Commits: <code>feat(n8n): add aoai token sub-workflow</code>, <code>feat(n8n): add chat workflow with user attribution</code>, <code>docs: phase-1 golden-baseline screenshots</code>. PR.</p>
+<p><span class="label label-verify">Verify</span> SPA → sign in → "Hello" → response &lt;5s; AOAI Metrics shows 1 successful call; activity log shows caller = <code>mi-n8n-aoai</code> principal; n8n execution log shows <code>X-Auth-Request-Email</code> = your UPN.</p>
+<p><span class="label label-why">Why</span> Immutable "before" baseline. Every Phase 2-5 change must not break this.</p>
+<p><span class="label label-gotcha">Gotcha</span> Token caching: forget it → every chat hits <code>login.microsoftonline.com</code> and gets throttled. Cache ≤ 50 min.</p>
+</div>
+
+<h3>Phase 1 exit checklist</h3>
+<ol>
+  <li><code>kubectl get pods -n n8n</code> shows n8n + oauth2-proxy + postgres + spa Running.</li>
+  <li>Golden smoke test passes end-to-end in &lt;5s.</li>
+  <li><code>az cognitiveservices account keys list</code> shows local auth disabled — <strong>no API key anywhere</strong>.</li>
+  <li><code>gh secret list</code> shows zero Azure secrets — <strong>all GitHub→Azure auth via OIDC</strong>.</li>
+  <li><code>kubectl get ds -A</code> shows no Defender DaemonSet — <strong>sensor not auto-deployed</strong>.</li>
+  <li>Defender for Cloud → Security alerts: zero on AKS (baseline).</li>
+  <li><code>git log --oneline main</code> shows 6 merged PRs from 1A through 1F.</li>
+</ol>
+
+<h2 id="phase-2">Phase 2 — Shift-left security <span class="phase">GHAS + Defender CLI</span></h2>
+<p>Goal: every PR gated. Vulnerabilities caught <strong>before</strong> AKS. Findings flow into Defender for Cloud for code-to-runtime context.</p>
+
+<h3>2A. Defender for DevOps GitHub connector</h3>
+<p><span class="label label-do">Do</span> Defender → Environment settings → Add → GitHub → grant access. Result: Defender ingests findings + CLI auth via connector (no YAML tokens).</p>
+<p><span class="label label-verify">Verify</span> Connector "Connected"; repo in DevOps inventory.</p>
+
+<h3>2A.1. DevOps environment posture management (free, automatic)</h3>
+<p><span class="label label-do">Do</span> Nothing — Defender's DevOps posture scanners run every 24h producing recommendations per the <a href="https://www.microsoft.com/security/blog/2023/04/06/devops-threat-matrix/">DevOps Threat Matrix</a>.</p>
+<p><span class="label label-verify">Verify</span> 24h after 2A, Defender → DevOps security → posture recommendations populated. Each fix = small PR.</p>
+<p><span class="label label-why">Why</span> "CSPM for your DevOps platform" — security-side scan of your <em>configuration</em>, distinct from CI scans of your <em>code</em>. Zero dev YAML.</p>
+<p><span class="label label-gotcha">Gotcha</span> GitHub findings appear as GHAS-native PR check-runs + Defender portal, not inline PR comments (unlike ADO).</p>
+
+<h3>2B. GHAS features</h3>
+<ul>
+  <li>CodeQL (JS for SPA, YAML for workflows), secret scanning + push protection, dep review, Dependabot.</li>
+  <li><code>.github/dependabot.yml</code> covering npm (SPA), Actions, Docker.</li>
+  <li>Branch protection on <code>main</code>: PR + signed commits + all status checks.</li>
+</ul>
+
+<h3>2C. Defender for Cloud CLI in CI (replaces Trivy)</h3>
+<ul>
+  <li>Install in workflow; auth via 2A connector.</li>
+  <li><code>defender scan image &lt;acr-image&gt;:&lt;sha&gt;</code> after build; fail on critical.</li>
+  <li>Results upload to Defender → DevOps findings + container inventory.</li>
+</ul>
+<p><span class="label label-why">Why</span> MDVM-backed = same severity scale as registry + runtime scan. One source of truth.</p>
+
+<h3>2D. IaC scanning via MSDO</h3>
+<ul>
+  <li><code>microsoft/security-devops-action@v1</code> runs Checkov + Terrascan + KubeLinter; uploads SARIF.</li>
+  <li>Gate high+critical; warn-only medium initially.</li>
+  <li>Future: retire MSDO when Defender CLI adds IaC scanning.</li>
+</ul>
+
+<h3>2E. SBOM + image signing</h3>
+<ul>
+  <li><code>syft</code> generates SBOM; attach as attestation.</li>
+  <li><code>cosign</code> keyless via GitHub OIDC. Push image + SBOM + signature to ACR.</li>
+  <li>Alternative: Notary v2 (Ratify supports both). cosign keyless = simpler.</li>
+</ul>
+
+<h3>2F. Secret hygiene audit</h3>
+<ul>
+  <li><code>gh secret list</code>: zero Azure + zero Defender tokens.</li>
+  <li>Route push protection alerts to Teams/Slack.</li>
+</ul>
+
+<h4>Phase 2 verification</h4>
+<ol>
+  <li>PR with vulnerable npm dep → blocked.</li>
+  <li>PR with Azure key in source → blocked at git push.</li>
+  <li>PR with known-CVE n8n image pin → blocked by Defender CLI; visible in Defender → DevOps within minutes.</li>
+  <li><code>cosign verify &lt;image&gt;</code> succeeds.</li>
+  <li>GHAS Security tab + Defender DevOps inventory show matching findings.</li>
+</ol>
+
+<h2 id="phase-3">Phase 3 — Cluster & runtime <span class="phase">Defender for Containers + hardening</span></h2>
+
+<h3>3.1 Defender plans</h3>
+<ul>
+  <li>Defender CSPM (paid — attack paths + agentless K8s).</li>
+  <li>Defender for Containers: agentless image scan + runtime threats + K8s recommendations.</li>
+  <li><code>azqr</code> to baseline before/after.</li>
+</ul>
+
+<h3>3.2 AKS hardening</h3>
+<ul>
+  <li>Private cluster + jump box or <code>az aks command invoke</code>.</li>
+  <li>Azure CNI Overlay + Cilium NetworkPolicy default-deny in <code>n8n</code> ns.</li>
+  <li>Pod Security Admission <code>restricted</code>.</li>
+  <li>KV CSI: move secrets to KV; pods fetch via workload identity.</li>
+  <li>Ratify + cosign verification → reject unsigned.</li>
+</ul>
+
+<h3>3.3 Ingress hardening</h3>
+<ul>
+  <li>AFD + WAF in front of n8n; NSG blocks direct ingress IP.</li>
+  <li>Rate-limit <code>/webhook/*</code> heavily.</li>
+  <li>AOAI: <code>publicNetworkAccess: 'Disabled'</code> + private endpoint in AKS subnet.</li>
+</ul>
+
+<h3>3.4 Logging + drift protection</h3>
+<ul>
+  <li>AKS diagnostic settings → LA.</li>
+  <li>Container Insights enabled.</li>
+  <li>Defender alerts → Defender for Cloud + Sentinel (Phase 6).</li>
+  <li><strong>Drift protection</strong> (Defender for Containers): detects processes/files not in original image — exact signal for CVE-2025-68613 reverse shell.</li>
+</ul>
+
+<h4>Phase 3 verification</h4>
+<ol>
+  <li><code>kubectl run --rm -it test --image=nginx</code> in <code>n8n</code> ns → blocked by Ratify.</li>
+  <li><code>kubectl exec</code> into n8n pod, <code>curl</code> other ns → blocked by NetworkPolicy.</li>
+  <li>AOAI private endpoint only inside VNet; public → 403.</li>
+  <li>Phase 1F smoke test still passes.</li>
+</ol>
+
+<h2 id="phase-4">Phase 4 — Identity & AI SPM <span class="phase">Entra CA + Defender AI</span></h2>
+
+<h3>4.1 Conditional Access</h3>
+<ul>
+  <li>SPA app: MFA + compliant device OR known network.</li>
+  <li><strong>Workload identity</strong> (<code>mi-n8n-aoai</code>) CA: restrict to AKS egress IP + resource = AOAI.</li>
+  <li>PIM-only for App Admin; no standing.</li>
+  <li>Identity Protection on SPA users.</li>
+</ul>
+
+<h3>4.2 Defender for AI Services</h3>
+<ul>
+  <li>Enable AI services plan on AOAI subscription.</li>
+  <li>Suspicious prompt evidence ON.</li>
+  <li><strong>Critical</strong>: verify end-user context (OID) reaches alerts via oauth2-proxy header → OpenAI body <code>user</code> field.</li>
+</ul>
+
+<h3>4.3 Purview DSPM for AI</h3>
+<ul>
+  <li>Toggle "Data security for AI interactions" ON.</li>
+  <li>Purview → DSPM for AI → onboard AOAI → SITs.</li>
+  <li>Activity Explorer shows every prompt/response with classification + user.</li>
+</ul>
+
+<h3>4.4 n8n credential hygiene</h3>
+<ul>
+  <li>All n8n credentials reference KV-mounted env vars.</li>
+  <li>Quarterly <code>N8N_ENCRYPTION_KEY</code> rotation.</li>
+  <li>n8n UI behind oauth2-proxy admin-group check.</li>
+</ul>
+
+<h4>Phase 4 verification</h4>
+<ol>
+  <li>Chat with fake SSN → Purview shows classified, user = your OID.</li>
+  <li>Prompt injection → Defender AI raises Jailbreak alert with OID.</li>
+  <li>Use MI token from outside AKS egress → CA blocks.</li>
+  <li>Phase 1F smoke test still passes.</li>
+</ol>
+
+<h2 id="phase-5">Phase 5 — Detonate CVE-2025-68613 <span class="phase">payoff phase</span></h2>
+
+<h3>5.1 Controlled vulnerable env</h3>
+<ul>
+  <li>Namespace <code>n8n-vuln</code>, NetworkPolicy-isolated, no AOAI permission by default.</li>
+  <li>Branch <code>lab/cve-2025-68613</code> pins n8n to vulnerable version.</li>
+  <li>PR observation: Defender CLI flags CVE → PR blocked. Override (lab admin), merge to <code>lab/*</code> deploying to <code>n8n-vuln</code> only.</li>
+</ul>
+
+<h3>5.2 Detonate</h3>
+<ul>
+  <li>Low-priv n8n user; attacker pod in separate ns; run public PoC.</li>
+  <li>Sub-tests: (a) reverse shell, (b) exfil DB creds, (c) re-add AOAI role + abuse workload identity token.</li>
+</ul>
+
+<h3>5.3 Detection scorecard</h3>
+<table>
+<thead><tr><th>Layer</th><th>Expected detection</th><th>Signal location</th></tr></thead>
+<tbody>
+<tr><td>GHAS (Phase 2)</td><td>Dep review flag in PR</td><td>GHAS Security tab</td></tr>
+<tr><td>Defender CLI (Phase 2)</td><td>Critical CVE blocks PR</td><td>PR status + Defender DevOps</td></tr>
+<tr><td>Defender Containers — registry</td><td>CVE in ACR image</td><td>Defender → Containers</td></tr>
+<tr><td>Defender Containers — runtime + drift</td><td>Reverse shell / drifted process</td><td>Defender → Alerts</td></tr>
+<tr><td>AKS audit log</td><td>Unusual API server calls</td><td>LA <code>AKSAudit</code></td></tr>
+<tr><td>Defender for AI Services</td><td>Jailbreak alert with workload identity attribution</td><td>Defender → AI alerts</td></tr>
+<tr><td>Entra workload identity logs</td><td>MI token used from suspicious context</td><td>Entra SP sign-ins</td></tr>
+<tr><td>Purview DSPM for AI</td><td>Sensitive data in attacker prompt</td><td>Purview Activity Explorer</td></tr>
+<tr><td><strong>MSEM attack-path</strong></td><td>PR → image → pod → AOAI abuse as one chain</td><td>Defender → Attack path analysis</td></tr>
+</tbody>
+</table>
+
+<h3>5.4 Remediate</h3>
+<ul>
+  <li>PR bumping to patched version → gates green → re-run PoC → exploit fails.</li>
+  <li>Post-mortem in <code>docs/incidents/cve-2025-68613.md</code>.</li>
+</ul>
+
+<h4>Phase 5 verification</h4>
+<ol>
+  <li>Scorecard filled with screenshots + timestamps.</li>
+  <li>Before-patch run: ≥ 5 of 9 layers alert.</li>
+  <li>After-patch run: zero alerts, PoC fails at app layer.</li>
+  <li>Phase 1F smoke test on production ns never impacted.</li>
+</ol>
+
+<h2 id="phase-6">Phase 6 — Continuous monitoring (optional)</h2>
+<ul>
+  <li><strong>MSEM</strong> = umbrella for Defender + XDR + Entra attack-graph. Already populating; Phase 6 = use it.</li>
+  <li>Sentinel workspace; connect Defender + XDR + Entra + AKS connectors.</li>
+  <li>Analytics rules: AI alert + n8n runtime alert &lt;10min → high-priority; failed CA on workload ID &gt;3/5min → disable MI via Logic App.</li>
+  <li>Workbook of Phase 5 scorecard as live dashboard.</li>
+  <li>Quarterly <code>azqr</code> baseline.</li>
+</ul>
+
+<h2 id="decisions">Decisions captured</h2>
+<ul>
+  <li><strong>Entra Agent ID</strong>: dropped.</li>
+  <li><strong>AOAI auth</strong>: Entra-only via workload identity (<code>disableLocalAuth: true</code>). No API key anywhere.</li>
+  <li><strong>n8n hop auth</strong>: oauth2-proxy validating SPA bearer tokens.</li>
+  <li><strong>End-user context for Defender AI</strong>: oauth2-proxy header → OpenAI <code>user</code> field.</li>
+  <li><strong>IaC</strong>: Terraform (azurerm + azuread + azapi), remote state with blob-lease locking.</li>
+  <li><strong>Defender Containers sensor</strong>: OFF Phase 1, ON Phase 3.</li>
+  <li><strong>Container vuln scanner in CI</strong>: Defender for Cloud CLI (replaces Trivy). MDVM-backed.</li>
+  <li><strong>Image signing</strong>: cosign keyless. Notary v2 noted as alternative.</li>
+  <li><strong>CVE-2025-68613</strong>: vulnerable version isolated; score 9 layers; then patch.</li>
+</ul>
+
+<h2 id="open">Open decisions</h2>
+<ol>
+  <li><strong>Token-fetch for n8n → AOAI</strong>: (A) pure n8n sub-workflow <em>(recommended)</em>, (B) token sidecar, (C) thin in-cluster API service.</li>
+  <li><strong>n8n install style</strong>: hand-rolled YAML <em>(recommended)</em> / Helm chart.</li>
+  <li><strong>Defender plan enablement cadence</strong>: per-phase <em>(recommended)</em> / all day 1.</li>
+  <li><strong>oauth2-proxy</strong>: sidecar / separate Deployment <em>(recommended)</em>.</li>
+</ol>
+
+<hr>
+<p style="color: var(--muted); font-size: 13px; text-align: center;">DevSecOps Lab plan · For security-engineer-learning-DevOps</p>
+
+</main>
+</body>
+</html>

@@ -1,0 +1,8 @@
+# Copy to terraform.tfvars (gitignored) and adjust only if your lab differs from defaults.
+# All values have sensible defaults in variables.tf.
+
+# prefix              = "dsolab"
+# location_primary    = "southeastasia"
+# location_aoai       = "australiaeast"
+# resource_group_name = "rg-dsolab-sea"
+# github_repo         = "tonzking123/dsolab"
