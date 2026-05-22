@@ -33,13 +33,21 @@ module "acr" {
 }
 
 module "keyvault" {
-  source                      = "../../modules/keyvault"
-  vault_name                  = "kv-${var.prefix}-sea-${random_string.suffix.result}"
-  location                    = var.location_primary
-  resource_group_name         = data.azurerm_resource_group.lab.name
-  tenant_id                   = data.azurerm_client_config.current.tenant_id
-  current_principal_object_id = data.azurerm_client_config.current.object_id
-  tags                        = var.tags
+  source              = "../../modules/keyvault"
+  vault_name          = "kv-${var.prefix}-sea-${random_string.suffix.result}"
+  location            = var.location_primary
+  resource_group_name = data.azurerm_resource_group.lab.name
+  tenant_id           = data.azurerm_client_config.current.tenant_id
+
+  # Grant KV Administrator to BOTH the TF runner (GHA MI in CI, your user locally)
+  # AND the designated human admin from var.human_admin_object_id. distinct() de-dups
+  # if you happen to be the runner; compact() drops nulls if human_admin_object_id is unset.
+  admin_principal_object_ids = distinct(compact([
+    data.azurerm_client_config.current.object_id,
+    var.human_admin_object_id,
+  ]))
+
+  tags = var.tags
 }
 
 # ───── Runtime ─────

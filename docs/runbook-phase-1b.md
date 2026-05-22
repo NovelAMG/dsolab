@@ -133,32 +133,47 @@ kubectl get nodes
 # Expected: 2 nodes, status Ready, Kubernetes version 1.30+
 
 kubectl get ns
-# Expected: default, kube-system, kube-node-lease, kube-public, gatekeeper-system (no — we disabled it!)
-# If you see gatekeeper-system, the Azure Policy add-on snuck in — re-check Phase 1C settings.
+# Expected: default, kube-system, kube-node-lease, kube-public (no gatekeeper-system!)
 
 kubectl get ds -A | grep -i defender
 # Expected: no rows — Defender sensor is OFF per Phase 1C ADR.
 
-# AOAI is reachable + key auth is correctly disabled
-AOAI_NAME=$(terraform -chdir=terraform/envs/lab output -raw aoai_endpoint | awk -F. '{print $1}' | awk -F/ '{print $NF}')
-az cognitiveservices account keys list --name "$AOAI_NAME" --resource-group rg-dsolab-sea 2>&1 | head -2
-# Expected: error message saying local auth is disabled — that's the desired security state.
+# AOAI: GPT-4o deployed + API keys correctly disabled
+az cognitiveservices account deployment list \
+  --resource-group rg-dsolab-sea \
+  --name aoai-dsolab-aue \
+  --query "[].{name:name, model:properties.model.name, version:properties.model.version, sku:sku.name}" -o table
+# Expected: one row showing gpt-4o, version 2024-11-20, sku GlobalStandard
+
+az cognitiveservices account keys list \
+  --resource-group rg-dsolab-sea \
+  --name aoai-dsolab-aue 2>&1 | head -3
+# Expected: error "Failed to list key. disableLocalAuth is set to be true" — that IS the desired state.
+
+# Key Vault should have 3 secrets
+KV_NAME=$(az keyvault list --resource-group rg-dsolab-sea --query "[0].name" -o tsv)
+az keyvault secret list --vault-name "$KV_NAME" --query "[].name" -o tsv
+# Expected: postgres-admin-login, postgres-admin-password, postgres-fqdn
 ```
 
 ## Step 8 — Set yourself as Postgres Entra admin (one-time, manual)
 
-The Postgres server is up but Entra admin isn't wired (Terraform can't easily know your UPN). Do this once so you can connect manually later:
+The Postgres server is up but the Entra admin isn't wired (Terraform can't easily know your UPN). Set it once:
 
 ```bash
-PSQL_NAME=$(terraform -chdir=terraform/envs/lab output -raw postgres_fqdn | awk -F. '{print $1}')
+PSQL_NAME=$(az postgres flexible-server list --resource-group rg-dsolab-sea --query "[0].name" -o tsv)
+USER_UPN=$(az ad signed-in-user show --query userPrincipalName -o tsv)
+USER_OID=$(az ad signed-in-user show --query id -o tsv)
 
-az postgres flexible-server ad-admin create \
+az postgres flexible-server microsoft-entra-admin create \
   --resource-group rg-dsolab-sea \
   --server-name "$PSQL_NAME" \
-  --display-name "$(az ad signed-in-user show --query userPrincipalName -o tsv)" \
-  --object-id "$(az ad signed-in-user show --query id -o tsv)" \
+  --display-name "$USER_UPN" \
+  --object-id "$USER_OID" \
   --type User
 ```
+
+> **Note**: the subcommand is `microsoft-entra-admin` (azure-cli ≥ 2.70). Older docs used `ad-admin` which was deprecated.
 
 ## Phase 1B exit criteria
 
@@ -200,7 +215,8 @@ kubectl get pods -A | grep -i defender || echo "✓ no defender pods (correct fo
 | AKS apply fails: "SubnetIsFull" / "InsufficientCpuQuota" | Subscription vCPU quota in SEA | Azure portal → Quotas → Compute → request more vCPUs in `southeastasia` |
 | Postgres apply fails: "ResourceQuotaExceeded" | Burstable family quota | Quotas → Postgres Flexible Servers → request increase |
 | `kubectl get nodes` after apply: "No connection" | `az aks get-credentials` not run yet | Run the command in Step 7 |
-| `az postgres ad-admin create` fails: "must specify type" | Older `az` CLI | `az upgrade` then retry |
+| `az postgres ad-admin create` fails: `'ad-admin' is misspelled` | azure-cli ≥ 2.70 renamed the subcommand | Use `az postgres flexible-server microsoft-entra-admin create ...` (see Step 8) |
+| KV access denied (`ForbiddenByRbac`) on `az keyvault secret list` after a CI-run apply | The `data.azurerm_client_config.current.object_id` in CI resolves to the GHA MI, not you. Without the `HUMAN_ADMIN_OID` GitHub variable set, only the MI got KV Administrator. | Set the variable: `gh variable set HUMAN_ADMIN_OID --body $(az ad signed-in-user show --query id -o tsv) --repo tonzking123/dsolab`, then re-run `terraform apply` (or grant yourself manually: `az role assignment create --assignee-object-id $(az ad signed-in-user show --query id -o tsv) --role 'Key Vault Administrator' --scope $(az keyvault show -n <kv-name> --query id -o tsv)`) |
 
 ## What's next
 

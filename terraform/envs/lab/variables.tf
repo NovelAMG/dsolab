@@ -37,3 +37,14 @@ variable "tags" {
     managed_by  = "terraform"
   }
 }
+
+variable "human_admin_object_id" {
+  description = <<-EOT
+    Object ID of the human admin who should retain Key Vault Administrator access
+    even when Terraform runs as the GitHub Actions MI. Set via TF_VAR or via the
+    HUMAN_ADMIN_OID GitHub repo variable (populated by the bootstrap script).
+    If null/empty, only the TF runner principal gets KV access.
+  EOT
+  type        = string
+  default     = null
+}
