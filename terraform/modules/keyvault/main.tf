@@ -15,12 +15,8 @@ resource "azurerm_key_vault" "this" {
   tags = var.tags
 }
 
-# Grant Key Vault Administrator to all principals listed in admin_principal_object_ids.
-# Typically includes both the TF runner (GHA MI) AND the human admin.
-resource "azurerm_role_assignment" "kv_admin" {
-  for_each = toset(var.admin_principal_object_ids)
-
-  scope                = azurerm_key_vault.this.id
-  role_definition_name = "Key Vault Administrator"
-  principal_id         = each.value
-}
+# Note: Key Vault Administrator role assignments are intentionally NOT managed
+# here. See ADR 0008. They are granted at RG scope by scripts/00-bootstrap-state.sh
+# to both the GHA MI and the human admin. Managing them in TF caused a chicken-and-egg
+# deadlock when the role assignment was refactored (CREATE conflicts with existing,
+# DELETE+CREATE leaves a gap where TF loses KV access mid-apply).

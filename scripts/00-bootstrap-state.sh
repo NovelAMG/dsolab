@@ -179,9 +179,19 @@ CONTAINER_SCOPE="${SA_ID}/blobServices/default/containers/${STATE_CONTAINER}"
 
 assign_role "Contributor" "$RG_SCOPE"
 assign_role "User Access Administrator" "$RG_SCOPE"
+assign_role "Key Vault Administrator" "$RG_SCOPE"
 assign_role "Storage Blob Data Contributor" "$CONTAINER_SCOPE"
 
-# Also grant current user Blob Data Contributor on the container (for local `terraform` runs)
+# Also grant the current user Key Vault Administrator on the RG (matches MI),
+# and Blob Data Contributor on the state container (for local `terraform` runs).
+# Without these, the human can't read KV secrets created by TF (ADR 0008).
+az role assignment create \
+  --assignee-object-id "$USER_OBJECT_ID" \
+  --assignee-principal-type User \
+  --role "Key Vault Administrator" \
+  --scope "$RG_SCOPE" \
+  --output none 2>/dev/null || true
+
 az role assignment create \
   --assignee-object-id "$USER_OBJECT_ID" \
   --assignee-principal-type User \
