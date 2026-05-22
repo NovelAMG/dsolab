@@ -199,6 +199,11 @@ gh variable set TF_STATE_SA           --body "$SA_NAME"         --repo "$GH_REPO
 gh variable set TF_STATE_CONTAINER    --body "$STATE_CONTAINER" --repo "$GH_REPO"
 gh variable set TF_STATE_KEY          --body "$TF_STATE_KEY"    --repo "$GH_REPO"
 
+# Human admin OID — used by Terraform to grant the human user Key Vault
+# Administrator alongside the GHA MI. Without this, only the MI would have KV access
+# after `terraform apply` runs in CI.
+gh variable set HUMAN_ADMIN_OID       --body "$USER_OBJECT_ID"  --repo "$GH_REPO"
+
 # ---------- Done ----------
 cat <<EOF
 
@@ -220,6 +225,7 @@ GitHub repo variables set on $GH_REPO:
   TF_STATE_SA           = $SA_NAME
   TF_STATE_CONTAINER    = $STATE_CONTAINER
   TF_STATE_KEY          = $TF_STATE_KEY
+  HUMAN_ADMIN_OID       = $USER_OBJECT_ID  (you, as the human admin)
 
 Local terraform init (for Phase 1B onward):
 

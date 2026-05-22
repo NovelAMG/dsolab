@@ -18,9 +18,9 @@ variable "tenant_id" {
   type        = string
 }
 
-variable "current_principal_object_id" {
-  description = "Object ID of the principal running Terraform (gets Key Vault Administrator)"
-  type        = string
+variable "admin_principal_object_ids" {
+  description = "Object IDs of principals to grant Key Vault Administrator (both TF runner and human admin)"
+  type        = list(string)
 }
 
 variable "tags" {

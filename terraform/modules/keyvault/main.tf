@@ -15,10 +15,12 @@ resource "azurerm_key_vault" "this" {
   tags = var.tags
 }
 
-# Grant the current principal (human or MI running TF) full secret management.
-# This is broad on purpose so apply can immediately write secrets in the env.
-resource "azurerm_role_assignment" "current_principal_kv_admin" {
+# Grant Key Vault Administrator to all principals listed in admin_principal_object_ids.
+# Typically includes both the TF runner (GHA MI) AND the human admin.
+resource "azurerm_role_assignment" "kv_admin" {
+  for_each = toset(var.admin_principal_object_ids)
+
   scope                = azurerm_key_vault.this.id
   role_definition_name = "Key Vault Administrator"
-  principal_id         = var.current_principal_object_id
+  principal_id         = each.value
 }
