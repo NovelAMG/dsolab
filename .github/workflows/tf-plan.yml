@@ -1,0 +1,90 @@
+name: Terraform Plan (PR)
+
+on:
+  pull_request:
+    paths:
+      - 'terraform/**'
+      - '.github/workflows/tf-plan.yml'
+      - '.github/workflows/tf-apply.yml'
+
+permissions:
+  id-token: write       # OIDC to Azure
+  contents: read
+  pull-requests: write  # post plan as PR comment
+
+concurrency:
+  group: tf-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  plan:
+    name: terraform plan
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform/envs/lab
+    env:
+      ARM_USE_OIDC:        "true"
+      ARM_CLIENT_ID:       ${{ vars.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID:       ${{ vars.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.5
+          terraform_wrapper: false
+
+      - name: terraform fmt -check
+        run: terraform -chdir=../.. fmt -check -recursive
+
+      - name: terraform init
+        run: |
+          terraform init \
+            -backend-config="resource_group_name=${{ vars.TF_STATE_RG }}" \
+            -backend-config="storage_account_name=${{ vars.TF_STATE_SA }}" \
+            -backend-config="container_name=${{ vars.TF_STATE_CONTAINER }}" \
+            -backend-config="key=${{ vars.TF_STATE_KEY }}"
+
+      - name: terraform validate
+        run: terraform validate
+
+      - name: terraform plan
+        id: plan
+        run: |
+          set +e
+          terraform plan -no-color -out=tfplan
+          echo "exitcode=$?" >> $GITHUB_OUTPUT
+          terraform show -no-color tfplan > plan.txt
+          # GitHub PR comment cap ~65000 chars; truncate safely
+          head -c 60000 plan.txt > plan-trunc.txt
+          tail -c 5000 plan.txt >> plan-trunc.txt || true
+
+      - name: Post plan to PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync('terraform/envs/lab/plan-trunc.txt', 'utf8');
+            const exitcode = '${{ steps.plan.outputs.exitcode }}';
+            const emoji = exitcode === '0' ? '✅' : '❌';
+            const body = `### ${emoji} Terraform Plan (exit ${exitcode})\n\n<details><summary>Click to expand plan output (${plan.length} chars)</summary>\n\n\`\`\`hcl\n${plan}\n\`\`\`\n\n</details>\n\nReview the plan above carefully before merging. Apply runs automatically on merge to \`main\`.`;
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: body
+            });
+
+      - name: Fail job if plan errored
+        if: steps.plan.outputs.exitcode != '0'
+        run: exit 1
