@@ -1,0 +1,131 @@
+# n8n Deployment.
+#
+# Notes for the security-engineer-learning-devops reader:
+#
+# 1. `serviceAccountName: n8n` ties this pod to the K8s SA we created in 1E-a,
+#    which is annotated with the n8n MI clientId. The Azure Workload Identity
+#    webhook (already installed in the cluster because we set
+#    workload_identity_enabled=true on AKS) sees the SA's
+#    `azure.workload.identity/use: "true"` label + the pod-level label below
+#    and AUTO-INJECTS:
+#       - env AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_FEDERATED_TOKEN_FILE,
+#         AZURE_AUTHORITY_HOST
+#       - a projected SA token volume at /var/run/secrets/azure/tokens/
+#    n8n itself doesn't use these yet (we wire them in 1E-d for AOAI calls),
+#    but the plumbing is in place now so 1E-d is a config-only change.
+#
+# 2. `replicas: 1` matches ADR 0011 — B2s nodes can't fit much. n8n is also
+#    not truly horizontally scalable without their enterprise queue mode, so
+#    1 replica is correct for any non-enterprise use.
+#
+# 3. Resource requests sized for B2s pressure. n8n + Node.js sits at ~250-350 MB
+#    idle, spikes to ~600 MB during workflow execution. Limit at 768 MiB stops
+#    a runaway workflow from evicting other pods.
+#
+# 4. `securityContext` runs as a non-root user (n8n image already uses uid 1000
+#    internally). `fsGroup: 1000` lets the n8n process write to the Azure Files
+#    mount (mount permissions default to root:root, fsGroup fixes that).
+#
+# 5. All credentials come from the `n8n-secrets` K8s Secret (populated by
+#    scripts/05-deploy-n8n.sh from Key Vault). No secrets in this file.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: n8n
+  namespace: n8n
+  labels:
+    app: n8n
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # RWX PVC supports RollingUpdate too, but n8n state on disk + DB lock = Recreate is safest
+  selector:
+    matchLabels:
+      app: n8n
+  template:
+    metadata:
+      labels:
+        app: n8n
+        azure.workload.identity/use: "true" # workload identity webhook trigger
+    spec:
+      serviceAccountName: n8n
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 1000
+        runAsNonRoot: true
+      containers:
+        - name: n8n
+          image: docker.n8n.io/n8nio/n8n:1.69.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 5678
+          envFrom:
+            - secretRef:
+                name: n8n-secrets
+          env:
+            # Static config that doesn't need to be secret
+            - name: N8N_PORT
+              value: "5678"
+            - name: N8N_PROTOCOL
+              value: "http"
+            - name: N8N_HOST
+              value: "localhost" # placeholder until 1E-c adds the real ingress hostname
+            - name: WEBHOOK_URL
+              value: "http://localhost:5678/" # ditto
+            - name: GENERIC_TIMEZONE
+              value: "Asia/Bangkok"
+            - name: TZ
+              value: "Asia/Bangkok"
+            - name: N8N_USER_MANAGEMENT_DISABLED
+              value: "false" # show the setup wizard on first visit
+            - name: DB_TYPE
+              value: "postgresdb"
+            - name: DB_POSTGRESDB_PORT
+              value: "5432"
+            - name: DB_POSTGRESDB_SSL_ENABLED
+              value: "true"
+            # Azure Postgres uses a chain rooted in DigiCert/Microsoft;
+            # n8n's pg-node driver defaults to strict verify which would need
+            # the CA bundle mounted. For the lab we accept the trade-off:
+            - name: DB_POSTGRESDB_SSL_REJECT_UNAUTHORIZED
+              value: "false"
+            # Disable the "diagnostics" telemetry (sends usage stats to n8n.io).
+            # Optional — purely a security-engineer-comfort thing.
+            - name: N8N_DIAGNOSTICS_ENABLED
+              value: "false"
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "384Mi"
+            limits:
+              cpu: "500m"
+              memory: "768Mi"
+          volumeMounts:
+            - name: data
+              mountPath: /home/node/.n8n
+          # n8n is slow to boot on Burstable VMs (~30-45s). Generous probes.
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: 5678
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 18 # = 3 minutes to come up
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 5678
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 5678
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: n8n-data
