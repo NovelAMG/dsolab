@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spa
+  namespace: n8n
+  labels:
+    app: spa
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spa
+  template:
+    metadata:
+      labels:
+        app: spa
+    spec:
+      securityContext:
+        runAsUser: 101 # nginx user in the alpine image
+        runAsNonRoot: true
+        fsGroup: 101
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: spa
+          # Image tag is updated by scripts/09-deploy-spa-and-workflow.sh
+          # to the SHA-tagged build from ACR. ":latest" is a placeholder.
+          image: acrdsolabxsqb.azurecr.io/dsolab/spa:latest
+          imagePullPolicy: Always # tiny image, want fast iteration during demos
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: "10m"
+              memory: "16Mi"
+            limits:
+              cpu: "100m"
+              memory: "64Mi"

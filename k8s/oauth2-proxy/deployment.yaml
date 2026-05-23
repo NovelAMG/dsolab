@@ -55,8 +55,11 @@ spec:
             - --client-secret=$(OAUTH2_PROXY_CLIENT_SECRET)
             - --redirect-url=$(OAUTH2_PROXY_REDIRECT_URL)
             - --scope=openid email profile
-            # ── Upstream (where to forward authenticated requests) ──
-            - --upstream=http://n8n.n8n.svc.cluster.local:5678
+            # ── Upstreams: SPA at /, n8n at /webhook ────────────────
+            # NGINX Ingress sends ALL traffic to us, then we fan out by path.
+            # 1E-d update: added the SPA upstream for /  (used to be just n8n).
+            - --upstream=http://spa.n8n.svc.cluster.local/
+            - --upstream=http://n8n.n8n.svc.cluster.local:5678/webhook
             - --http-address=0.0.0.0:4180
             # ── Cookie / session ─────────────────────────────────────
             - --cookie-secret=$(OAUTH2_PROXY_COOKIE_SECRET)
@@ -76,6 +79,15 @@ spec:
             - --pass-authorization-header=true
             - --set-xauthrequest=true      # also set X-Auth-Request-* headers
             - --reverse-proxy=true         # we're behind NGINX
+            # ── 1E-d: accept JWT bearer tokens too ──────────────────
+            # When the SPA calls /webhook/chat with Authorization: Bearer <msal-token>,
+            # oauth2-proxy validates the JWT signature against the same OIDC issuer
+            # (Entra v2) and passes the request through instead of redirecting to
+            # /oauth2/start. Without this, the SPA's fetch would get a 302 to login.
+            - --skip-jwt-bearer-tokens=true
+            # The n8n-api app reg's audience. extra-jwt-issuers maps an issuer URL
+            # to the expected audience for tokens from that issuer.
+            - --extra-jwt-issuers=$(OIDC_ISSUER_URL)=$(N8N_API_AUDIENCE)
           envFrom:
             - secretRef:
                 name: oauth2-proxy-secrets

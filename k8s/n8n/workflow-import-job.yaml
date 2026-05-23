@@ -1,0 +1,82 @@
+# K8s Job that imports the chat workflow into n8n's database, then activates it.
+#
+# n8n's CLI talks directly to its Postgres DB (using the same DB_POSTGRESDB_*
+# env vars the n8n pod uses). It does NOT go through the HTTP API, so it
+# doesn't need any session / auth — just DB access.
+#
+# Steps inside the container:
+#   1. `n8n import:workflow --input=/workflow/chat.json` — upserts the workflow
+#   2. Capture the inserted workflow ID
+#   3. `n8n update:workflow --id=<id> --active=true` — activate it
+#
+# The ConfigMap `n8n-workflow-chat` is created by scripts/09 from
+# n8n-workflows/chat.json. If you need to update the workflow, edit the JSON
+# and re-run scripts/09 — the Job runs again and upserts.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: import-chat-workflow
+  namespace: n8n
+spec:
+  ttlSecondsAfterFinished: 600
+  backoffLimit: 2
+  template:
+    spec:
+      serviceAccountName: n8n # same SA n8n uses (no need to invent another)
+      restartPolicy: Never
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 1000
+      containers:
+        - name: n8n-cli
+          image: docker.n8n.io/n8nio/n8n:1.69.0
+          envFrom:
+            - secretRef:
+                name: n8n-secrets # DB_POSTGRESDB_* from KV (same as the n8n pod)
+            - configMapRef:
+                name: n8n-config
+          env:
+            # Avoid n8n trying to start the editor server / webhook server here.
+            - name: DB_POSTGRESDB_PORT
+              value: "5432"
+            - name: DB_TYPE
+              value: "postgresdb"
+            - name: DB_POSTGRESDB_SSL_ENABLED
+              value: "true"
+            - name: DB_POSTGRESDB_SSL_REJECT_UNAUTHORIZED
+              value: "false"
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+              echo ">>> Importing workflow..."
+              n8n import:workflow --input=/workflow/chat.json
+
+              # n8n's import:workflow outputs the inserted/updated IDs. We grab
+              # the most recently updated workflow named "chat".
+              WF_ID=$(n8n list:workflow --json | node -e "
+                let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{
+                  const wfs=JSON.parse(s);
+                  const m=wfs.find(w=>w.name==='chat');
+                  if(!m){console.error('chat workflow not found after import');process.exit(1)}
+                  console.log(m.id);
+                });
+              ")
+              echo ">>> Workflow id: $WF_ID"
+
+              echo ">>> Activating workflow..."
+              n8n update:workflow --id="$WF_ID" --active=true
+
+              echo ">>> Done."
+          volumeMounts:
+            - name: workflow
+              mountPath: /workflow
+              readOnly: true
+      # NOTE: we deliberately do NOT mount the n8n PVC (n8n-data). It's RWO
+      # (Azure Disk, ADR 0012) and the n8n pod already has it. The CLI doesn't
+      # need filesystem state — it just needs the same DB and the same
+      # N8N_ENCRYPTION_KEY env var (both come from the n8n-secrets Secret).
+      volumes:
+        - name: workflow
+          configMap:
+            name: n8n-workflow-chat
