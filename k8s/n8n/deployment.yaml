@@ -93,13 +93,18 @@ spec:
             # Optional — purely a security-engineer-comfort thing.
             - name: N8N_DIAGNOSTICS_ENABLED
               value: "false"
-            # Allow `require('fs')` in Code nodes. Our chat workflow reads the
-            # projected federated SA token from /var/run/secrets/azure/tokens/
-            # to exchange for an AOAI access token via the WL-identity flow.
-            # Without this, the Code node throws "Cannot find module 'fs'" because
-            # n8n's vm2 sandbox blocks require() by default.
+            # Allow Node built-ins in Code nodes (`require('fs')`, etc.).
+            # Our chat workflow reads the projected federated SA token from
+            # /var/run/secrets/azure/tokens/ to exchange for an AOAI access
+            # token via the WL-identity flow. Without this, the Code node
+            # throws "Cannot find module 'fs'" because n8n's vm2 sandbox
+            # blocks require() by default.
+            #
+            # We use "*" (allow all) rather than "fs" so additional built-ins
+            # (crypto, path, etc.) work for future Code nodes without another
+            # rollout. See ADR 0014 for the broader vm2 sandbox notes.
             - name: NODE_FUNCTION_ALLOW_BUILTIN
-              value: "fs"
+              value: "*"
           resources:
             requests:
               cpu: "200m"
