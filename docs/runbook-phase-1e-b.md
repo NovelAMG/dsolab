@@ -185,12 +185,14 @@ gh pr merge --squash --delete-branch
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| init job fails: `password authentication failed` | The `postgres-admin-password` KV secret is stale (e.g., TF re-ran and rotated it) | Re-run `04-postgres-init.sh` — it reads the current KV value |
-| init job fails: `Could not connect to server` | Postgres firewall changed (someone toggled `AllowAllAzureServices` off) | `az postgres flexible-server firewall-rule create --rule-name AllowAllAzureServices --start-ip-address 0.0.0.0 --end-ip-address 0.0.0.0 -g rg-dsolab-sea -n psql-dsolab-sea-xsqb` |
+| init job fails: `connection timed out` from psql | **Postgres server is stopped** (saves cost while idle; auto-stops after 7 days, or someone ran `az postgres flexible-server stop`) | `az postgres flexible-server start -g rg-dsolab-sea -n psql-dsolab-sea-xsqb` then retry the script |
+| init job pod stuck `ContainerCreating` for >2 min | Scheduled on a degraded AKS node (kubelet/networking wedged) | `kubectl cordon <bad-node>`; `kubectl delete pod -n n8n -l job-name=postgres-init --force --grace-period=0` |
+| init job fails: `password authentication failed` | The `postgres-admin-password` KV secret is stale (TF re-ran and rotated it) | Re-run `04-postgres-init.sh` — it reads the current KV value |
+| n8n pod stuck `Pending`: `Insufficient memory` | Defender + Gatekeeper eat >1 GiB per node — B2s baseline is ~94% committed | `az aks scale -g rg-dsolab-sea -n aks-dsolab-sea --node-count 3` (see ADR 0013) |
+| n8n pod `ContainerCreating` with `mount error(13): Permission denied` on `*.file.core.windows.net` | Defender CSPM auto-disables `allowSharedKeyAccess` on auto-provisioned Azure Files storage accounts, and a deny-policy blocks re-enabling it | We switched the PVC to Azure Disk (`managed-csi`). See ADR 0012 |
 | n8n pod CrashLoopBackOff with `ECONNREFUSED ::1:5432` | DB env vars not set (Secret missing or typo'd) | `kubectl describe pod -n n8n -l app=n8n` and check `Environment From` lists `n8n-secrets`; if not, re-run `05-deploy-n8n.sh` |
-| Pod stuck `Pending` with `pod has unbound PersistentVolumeClaims` | Azure Files PVC provisioning takes 60-90s on first attach | Wait, then `kubectl describe pvc -n n8n n8n-data` |
-| Pod runs but health probe fails | First-boot DB migration is slow on B2s (~30-60s) | `startupProbe` already gives 3 min; if still failing, check `kubectl logs -n n8n deploy/n8n` for migration errors |
-| Browser shows "Setup new owner account" but submit fails silently | n8n encryption key mismatch (changed between Secret creation + pod start) | Delete the pod, the new one picks up current Secret: `kubectl delete pod -n n8n -l app=n8n` |
+| Pod stuck `Pending`: `pod has unbound PersistentVolumeClaims` | Azure Disk provisioning takes 60-90s on first attach | Wait, then `kubectl describe pvc -n n8n n8n-data` |
+| n8n setup-wizard submit fails silently | n8n encryption key mismatch (changed between Secret creation + pod start) | Delete the pod, the new one picks up current Secret: `kubectl delete pod -n n8n -l app=n8n` |
 
 ---
 
