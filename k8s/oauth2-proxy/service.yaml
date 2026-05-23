@@ -1,0 +1,19 @@
+# Internal ClusterIP service for oauth2-proxy.
+# The NGINX Ingress sends traffic here; oauth2-proxy auths it and proxies
+# to n8n in turn.
+apiVersion: v1
+kind: Service
+metadata:
+  name: oauth2-proxy
+  namespace: n8n
+  labels:
+    app: oauth2-proxy
+spec:
+  type: ClusterIP
+  selector:
+    app: oauth2-proxy
+  ports:
+    - name: http
+      port: 4180
+      targetPort: 4180
+      protocol: TCP

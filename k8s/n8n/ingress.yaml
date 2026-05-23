@@ -1,0 +1,46 @@
+# NGINX Ingress for n8n (via oauth2-proxy).
+#
+# Traffic flow:
+#   Internet → 20.195.16.7:443 → NGINX Ingress (terminates TLS) →
+#     oauth2-proxy (auths) → n8n
+#
+# Key annotations:
+#   - cert-manager.io/cluster-issuer: triggers Let's Encrypt cert issuance
+#     via the issuer we applied in 1E-a (letsencrypt-staging).
+#   - nginx.ingress.kubernetes.io/proxy-body-size: n8n workflows can have
+#     large payloads; default 1m would 413 on uploads.
+#   - nginx.ingress.kubernetes.io/ssl-redirect: forces http -> https.
+#   - WebSocket support: NGINX Ingress detects upgrade headers automatically,
+#     no special annotation needed.
+#
+# Hostname is templated via scripts/07-deploy-oauth2-proxy.sh because it
+# depends on the runtime ingress IP (chat.<IP>.nip.io). The script does an
+# `envsubst` before applying.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: n8n
+  namespace: n8n
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-staging
+    nginx.ingress.kubernetes.io/proxy-body-size: "32m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600" # 1h for long-running workflow executions
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - ${INGRESS_HOST}
+      secretName: n8n-tls # cert-manager will populate this Secret with the cert
+  rules:
+    - host: ${INGRESS_HOST}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: oauth2-proxy # NOT n8n directly — auth gate first
+                port:
+                  number: 4180
