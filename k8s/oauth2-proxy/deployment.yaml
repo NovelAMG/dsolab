@@ -1,0 +1,103 @@
+# oauth2-proxy Deployment.
+#
+# What this is:
+#   A small Go binary that sits in front of n8n. For every request:
+#     1. If there's no valid session cookie, redirect to Entra to log in.
+#     2. After Entra redirects back, oauth2-proxy validates the token,
+#        sets an encrypted session cookie, and proxies the request to n8n.
+#     3. If the cookie is valid, request goes straight to n8n.
+#
+# How it differs from "oauth2-proxy in auth_request mode":
+#   In auth_request mode, NGINX makes a subrequest to oauth2-proxy /oauth2/auth
+#   and only proxies to the real upstream if it returns 202. That's the
+#   pattern you see in many tutorials.
+#
+#   We chose REVERSE-PROXY mode (--upstream=...) here because:
+#     - One less moving piece (NGINX isn't doing subrequests)
+#     - oauth2-proxy handles WebSockets correctly for the n8n editor
+#     - The redirect dance on login is simpler (no NGINX rewrite needed)
+#
+# All sensitive values come from the `oauth2-proxy-secrets` K8s Secret that
+# scripts/07 creates from Key Vault.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oauth2-proxy
+  namespace: n8n
+  labels:
+    app: oauth2-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: oauth2-proxy
+  template:
+    metadata:
+      labels:
+        app: oauth2-proxy
+    spec:
+      # Tight security defaults — this pod terminates user traffic.
+      securityContext:
+        runAsUser: 65532
+        runAsNonRoot: true
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: oauth2-proxy
+          image: quay.io/oauth2-proxy/oauth2-proxy:v7.7.1
+          imagePullPolicy: IfNotPresent
+          args:
+            # ── OIDC provider config ─────────────────────────────────
+            - --provider=oidc
+            - --oidc-issuer-url=$(OIDC_ISSUER_URL)
+            - --client-id=$(OAUTH2_PROXY_CLIENT_ID)
+            - --client-secret=$(OAUTH2_PROXY_CLIENT_SECRET)
+            - --redirect-url=$(OAUTH2_PROXY_REDIRECT_URL)
+            - --scope=openid email profile
+            # ── Upstream (where to forward authenticated requests) ──
+            - --upstream=http://n8n.n8n.svc.cluster.local:5678
+            - --http-address=0.0.0.0:4180
+            # ── Cookie / session ─────────────────────────────────────
+            - --cookie-secret=$(OAUTH2_PROXY_COOKIE_SECRET)
+            - --cookie-secure=true
+            - --cookie-samesite=lax
+            - --cookie-expire=12h
+            - --cookie-refresh=1h
+            # ── Auth / users allowed ─────────────────────────────────
+            # email-domain=* allows ANY @-domain. For prod restrict to your
+            # tenant domain(s), e.g. --email-domain=microsoft.com
+            - --email-domain=*
+            # WhitelistDomain lets the post-login redirect target our host.
+            - --whitelist-domain=$(INGRESS_HOST)
+            # ── Behaviour ────────────────────────────────────────────
+            - --skip-provider-button=true  # skip "sign in with Microsoft" page
+            - --pass-access-token=true     # send Entra access token upstream as X-Forwarded-Access-Token
+            - --pass-authorization-header=true
+            - --set-xauthrequest=true      # also set X-Auth-Request-* headers
+            - --reverse-proxy=true         # we're behind NGINX
+          envFrom:
+            - secretRef:
+                name: oauth2-proxy-secrets
+          ports:
+            - name: http
+              containerPort: 4180
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 4180
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: 4180
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"

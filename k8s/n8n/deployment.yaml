@@ -63,16 +63,15 @@ spec:
           envFrom:
             - secretRef:
                 name: n8n-secrets
+            # 1E-c: n8n-config ConfigMap holds N8N_HOST/N8N_PROTOCOL/WEBHOOK_URL
+            # which depend on the runtime ingress FQDN. Script 07 creates/updates it.
+            - configMapRef:
+                name: n8n-config
+                optional: true # Deployment still rolls if ConfigMap missing (pre-1E-c)
           env:
-            # Static config that doesn't need to be secret
+            # Static config that doesn't depend on hostname / can't be secret
             - name: N8N_PORT
               value: "5678"
-            - name: N8N_PROTOCOL
-              value: "http"
-            - name: N8N_HOST
-              value: "localhost" # placeholder until 1E-c adds the real ingress hostname
-            - name: WEBHOOK_URL
-              value: "http://localhost:5678/" # ditto
             - name: GENERIC_TIMEZONE
               value: "Asia/Bangkok"
             - name: TZ
