@@ -1,0 +1,86 @@
+# Checkov — IaC + Kubernetes manifest static analysis
+#
+# Phase 2E. Scans:
+#   - terraform/   (Azure provider — VNets, AKS, ACR, KV, etc.)
+#   - k8s/         (raw manifests)
+#   - Dockerfiles  (best-practice rules — non-root, no latest tag, etc.)
+#
+# Mode at this phase: INFORMATIONAL (SARIF → Security tab, never blocks PRs).
+# See ADR 0015 — we have ~95 inherited findings to triage first; making
+# Checkov blocking now would force a 95-line allowlist or block every PR.
+# Flip to blocking after the baseline is green (tracking issue in repo).
+name: Checkov (IaC)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'terraform/**'
+      - 'k8s/**'
+      - 'spa/Dockerfile'
+      - '.checkov.yaml'
+      - '.github/workflows/checkov.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'terraform/**'
+      - 'k8s/**'
+      - 'spa/Dockerfile'
+      - '.checkov.yaml'
+      - '.github/workflows/checkov.yml'
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+concurrency:
+  group: checkov-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    name: Checkov scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Checkov
+        run: |
+          python -m pip install --upgrade pip
+          pip install 'checkov>=3.2,<4'
+
+      - name: Run Checkov (SARIF)
+        # --soft-fail so we always exit 0 — informational mode at this phase.
+        # Findings go to the Security tab via the SARIF upload below.
+        run: |
+          checkov \
+            --config-file .checkov.yaml \
+            --output sarif \
+            --output-file-path . \
+            --soft-fail
+
+      - name: Upload Checkov SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results_sarif.sarif
+          category: checkov
+
+      - name: Run Checkov (CLI summary in PR log)
+        # Same scan, table output so reviewers can eyeball it without opening
+        # the Security tab. Still --soft-fail; never blocks.
+        run: |
+          checkov \
+            --config-file .checkov.yaml \
+            --output cli \
+            --compact \
+            --soft-fail

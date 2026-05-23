@@ -42,3 +42,8 @@ Thumbs.db
 kubeconfig
 .azure/
 .kube/
+
+# Scratch / debugging — paste error output into error.txt and it stays local
+error.txt
+*.scratch
+scratch/

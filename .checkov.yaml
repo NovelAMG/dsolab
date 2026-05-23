@@ -1,0 +1,30 @@
+# Checkov config — Phase 2 baseline
+#
+# Mode: informational (workflow runs with --soft-fail).
+# Findings appear in the GitHub Security tab via SARIF upload.
+#
+# Once the baseline is triaged (see tracking issue in the repo), we'll
+# flip .github/workflows/checkov.yml to blocking and add real skip-check
+# entries here with reasons. For now, an empty allowlist keeps findings
+# visible — we want to see them, not hide them.
+#
+# Reference: https://www.checkov.io/2.Basics/CLI%20Command%20Reference.html
+
+directory:
+  - terraform
+  - k8s
+  - spa
+
+framework:
+  - terraform
+  - kubernetes
+  - dockerfile
+
+# Don't graph-walk external Terraform modules — keeps the scan focused
+# on code we control.
+download-external-modules: false
+
+# Allowlist — empty for now. Add entries ONLY with a reason comment.
+# Example:
+#   skip-check:
+#     - CKV_K8S_43  # image digest pinning — Phase 4 (needs cosign + admission)
