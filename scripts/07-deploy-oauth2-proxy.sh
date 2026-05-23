@@ -66,6 +66,31 @@ read -p "Proceed? (y/N) " -n 1 -r CONFIRM
 echo
 [[ "$CONFIRM" =~ ^[Yy]$ ]] || { echo "Aborted."; exit 0; }
 
+# ---------- 0. Self-heal NGINX admission webhook CA ----------
+# The ingress-nginx Helm chart installs a ValidatingWebhookConfiguration whose
+# caBundle is populated by a post-install Job (`ingress-nginx-admission-patch`).
+# That Job can silently no-op if the chart was previously upgraded with
+# `--reuse-values` (it skips re-running the patch hook). When the caBundle is
+# empty, every Ingress create fails with:
+#   "x509: certificate signed by unknown authority"
+# Re-patching from the existing Secret is safe and idempotent. See ADR 0014.
+echo ""
+echo "[0/7] Self-heal: ensure ingress-nginx admission webhook caBundle..."
+WEBHOOK_CA=$(kubectl get validatingwebhookconfiguration ingress-nginx-admission \
+  -o jsonpath='{.webhooks[0].clientConfig.caBundle}' 2>/dev/null || echo "")
+if [[ -z "$WEBHOOK_CA" ]]; then
+  echo "  caBundle empty — patching from the ingress-nginx-admission Secret..."
+  CA=$(kubectl get secret -n ingress-nginx ingress-nginx-admission -o jsonpath='{.data.ca}')
+  [[ -n "$CA" ]] || { echo "ERROR: ingress-nginx-admission Secret missing CA. Re-install nginx?"; exit 1; }
+  kubectl patch validatingwebhookconfiguration ingress-nginx-admission \
+    --type='json' \
+    -p="[{\"op\":\"replace\",\"path\":\"/webhooks/0/clientConfig/caBundle\",\"value\":\"$CA\"}]" \
+    --output none
+  echo "  ✓ caBundle patched"
+else
+  echo "  ✓ caBundle already populated"
+fi
+
 # ---------- 1. Fetch secrets from KV ----------
 echo ""
 echo "[1/7] Reading secrets from Key Vault..."

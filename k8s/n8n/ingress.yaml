@@ -27,6 +27,13 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600" # 1h for long-running workflow executions
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # Entra ID's id_token contains many claims (groups, roles, app roles) which
+    # makes oauth2-proxy's session cookie >4 KiB. oauth2-proxy splits it across
+    # multiple cookies (_oauth2_proxy_0, _1, ...). When the browser sends them
+    # all on the next request, NGINX's default 4k proxy buffer overflows -> 502.
+    # 32k handles ~8 cookie chunks comfortably. See ADR 0014.
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "32k"
+    nginx.ingress.kubernetes.io/proxy-buffers-number: "4"
 spec:
   ingressClassName: nginx
   tls:
