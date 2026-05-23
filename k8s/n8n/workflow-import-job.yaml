@@ -24,6 +24,11 @@ spec:
     spec:
       serviceAccountName: n8n # same SA n8n uses (no need to invent another)
       restartPolicy: Never
+      # CRITICAL: when a Pod has a same-namespace Service called `n8n`, k8s
+      # auto-injects env vars like N8N_PORT=tcp://10.0.x.x:5678 that SHADOW
+      # n8n's own N8N_PORT=5678 config and make the CLI crash with
+      # "Invalid number value for N8N_PORT". Turn that off.
+      enableServiceLinks: false
       securityContext:
         fsGroup: 1000
         runAsUser: 1000
@@ -45,29 +50,20 @@ spec:
               value: "true"
             - name: DB_POSTGRESDB_SSL_REJECT_UNAUTHORIZED
               value: "false"
+            # Don't be noisy about settings-file perms in the Job container.
+            - name: N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS
+              value: "false"
           command: ["/bin/sh", "-c"]
           args:
             - |
               set -eu
               echo ">>> Importing workflow..."
               n8n import:workflow --input=/workflow/chat.json
-
-              # n8n's import:workflow outputs the inserted/updated IDs. We grab
-              # the most recently updated workflow named "chat".
-              WF_ID=$(n8n list:workflow --json | node -e "
-                let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{
-                  const wfs=JSON.parse(s);
-                  const m=wfs.find(w=>w.name==='chat');
-                  if(!m){console.error('chat workflow not found after import');process.exit(1)}
-                  console.log(m.id);
-                });
-              ")
-              echo ">>> Workflow id: $WF_ID"
-
-              echo ">>> Activating workflow..."
-              n8n update:workflow --id="$WF_ID" --active=true
-
-              echo ">>> Done."
+              echo ""
+              echo ">>> Done. Workflow imported."
+              echo ">>> ACTIVATION: open the n8n UI at https://chat.<ip>.nip.io/ ,"
+              echo ">>>             go to Workflows -> chat , and toggle Active (top right)."
+              echo ">>>             (Auto-activation via CLI is brittle across n8n versions; one-click is reliable.)"
           volumeMounts:
             - name: workflow
               mountPath: /workflow

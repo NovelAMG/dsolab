@@ -1,123 +1,125 @@
-{
-  "name": "chat",
-  "active": true,
-  "settings": {
-    "executionOrder": "v1"
-  },
-  "nodes": [
-    {
-      "parameters": {
-        "httpMethod": "POST",
-        "path": "chat",
-        "responseMode": "responseNode",
-        "options": {}
-      },
-      "id": "webhook-trigger",
-      "name": "Webhook",
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2,
-      "position": [
-        240,
-        300
-      ],
-      "webhookId": "dsolab-chat-webhook"
+[
+  {
+    "name": "chat",
+    "active": true,
+    "settings": {
+      "executionOrder": "v1"
     },
-    {
-      "parameters": {
-        "language": "javaScript",
-        "jsCode": "// 1E-d core: exchange this pod's federated SA token for an Azure OpenAI access token.\n//\n// The Azure Workload Identity webhook (enabled on AKS in 1B and bound via the\n// n8n SA in 1E-a) projects a short-lived federated token at:\n//   /var/run/secrets/azure/tokens/azure-identity-token\n// and sets AZURE_CLIENT_ID / AZURE_TENANT_ID / AZURE_FEDERATED_TOKEN_FILE.\n//\n// We use the `client_credentials` grant with the federated token as a\n// `client_assertion` (OAuth 2.0 client-assertion-type: jwt-bearer). That gives\n// us an access token for the AOAI resource without ANY secret on disk.\n\nconst fs = require('fs');\nconst path = require('path');\n\nconst tokenFile = process.env.AZURE_FEDERATED_TOKEN_FILE\n  || '/var/run/secrets/azure/tokens/azure-identity-token';\nconst tenantId = process.env.AZURE_TENANT_ID;\nconst clientId = process.env.AZURE_CLIENT_ID;\n\nif (!tenantId || !clientId) {\n  throw new Error(`Missing AZURE_TENANT_ID/AZURE_CLIENT_ID. WL identity webhook not active on this pod?`);\n}\n\nconst federatedAssertion = fs.readFileSync(tokenFile, 'utf8').trim();\n\nconst params = new URLSearchParams({\n  client_id: clientId,\n  grant_type: 'client_credentials',\n  client_assertion_type: 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',\n  client_assertion: federatedAssertion,\n  scope: 'https://cognitiveservices.azure.com/.default'\n});\n\nconst resp = await this.helpers.httpRequest({\n  method: 'POST',\n  url: `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`,\n  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },\n  body: params.toString(),\n  json: true\n});\n\n// Pull the caller's oid from the X-Auth-Request-User header (oauth2-proxy sets it\n// for JWT-validated requests) so we can pass `user` to AOAI for Defender attribution.\nconst headers = $('Webhook').first().json.headers || {};\nconst callerOid = headers['x-auth-request-user'] || headers['x-forwarded-user'] || 'anonymous';\n\nreturn [{\n  json: {\n    aoaiToken: resp.access_token,\n    callerOid,\n    userMessage: $('Webhook').first().json.body?.message || ''\n  }\n}];"
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "chat",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "id": "webhook-trigger",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          240,
+          300
+        ],
+        "webhookId": "dsolab-chat-webhook"
       },
-      "id": "get-aoai-token",
-      "name": "Get AOAI Token (WL identity)",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        460,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "=https://aoai-dsolab-aue.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-10-21",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
+      {
+        "parameters": {
+          "language": "javaScript",
+          "jsCode": "// 1E-d core: exchange this pod's federated SA token for an Azure OpenAI access token.\n//\n// The Azure Workload Identity webhook (enabled on AKS in 1B and bound via the\n// n8n SA in 1E-a) projects a short-lived federated token at:\n//   /var/run/secrets/azure/tokens/azure-identity-token\n// and sets AZURE_CLIENT_ID / AZURE_TENANT_ID / AZURE_FEDERATED_TOKEN_FILE.\n//\n// We use the `client_credentials` grant with the federated token as a\n// `client_assertion` (OAuth 2.0 client-assertion-type: jwt-bearer). That gives\n// us an access token for the AOAI resource without ANY secret on disk.\n//\n// NOTES on n8n's vm2 sandbox limitations:\n//   - process.env is NOT exposed: use $env.X instead\n//   - URLSearchParams is NOT exposed: hand-encode the form body\n//   - require() is restricted: NODE_FUNCTION_ALLOW_BUILTIN=* on the pod\n\nconst fs = require('fs');\n\nconst tokenFile = $env.AZURE_FEDERATED_TOKEN_FILE\n  || '/var/run/secrets/azure/tokens/azure-identity-token';\nconst tenantId = $env.AZURE_TENANT_ID;\nconst clientId = $env.AZURE_CLIENT_ID;\n\nif (!tenantId || !clientId) {\n  throw new Error('Missing AZURE_TENANT_ID/AZURE_CLIENT_ID. WL identity webhook not active on this pod?');\n}\n\nconst federatedAssertion = fs.readFileSync(tokenFile, 'utf8').trim();\n\nconst enc = encodeURIComponent;\nconst body = [\n  ['client_id', clientId],\n  ['grant_type', 'client_credentials'],\n  ['client_assertion_type', 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'],\n  ['client_assertion', federatedAssertion],\n  ['scope', 'https://cognitiveservices.azure.com/.default'],\n].map(([k, v]) => `${enc(k)}=${enc(v)}`).join('&');\n\nconst resp = await this.helpers.httpRequest({\n  method: 'POST',\n  url: `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`,\n  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },\n  body,\n  json: true,\n});\n\nconst headers = $('Webhook').first().json.headers || {};\nconst callerOid = headers['x-auth-request-user'] || headers['x-forwarded-user'] || 'anonymous';\n\nreturn [{\n  json: {\n    aoaiToken: resp.access_token,\n    callerOid,\n    userMessage: $('Webhook').first().json.body?.message || '',\n  },\n}];"
+        },
+        "id": "get-aoai-token",
+        "name": "Get AOAI Token (WL identity)",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          460,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "=https://aoai-dsolab-aue.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-10-21",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "=Bearer {{ $json.aoaiToken }}"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"messages\": [\n    { \"role\": \"system\", \"content\": \"You are a helpful assistant running in a DevSecOps lab on AKS. Keep replies short.\" },\n    { \"role\": \"user\", \"content\": {{ JSON.stringify($json.userMessage) }} }\n  ],\n  \"user\": {{ JSON.stringify($json.callerOid) }},\n  \"max_tokens\": 400,\n  \"temperature\": 0.4\n}",
+          "options": {
+            "timeout": 30000
+          }
+        },
+        "id": "call-aoai",
+        "name": "Call Azure OpenAI",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          680,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={ \"reply\": {{ JSON.stringify($json.choices[0].message.content) }} }",
+          "options": {}
+        },
+        "id": "respond",
+        "name": "Respond to Webhook",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.1,
+        "position": [
+          900,
+          300
+        ]
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
             {
-              "name": "Authorization",
-              "value": "=Bearer {{ $json.aoaiToken }}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
+              "node": "Get AOAI Token (WL identity)",
+              "type": "main",
+              "index": 0
             }
           ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"messages\": [\n    { \"role\": \"system\", \"content\": \"You are a helpful assistant running in a DevSecOps lab on AKS. Keep replies short.\" },\n    { \"role\": \"user\", \"content\": {{ JSON.stringify($json.userMessage) }} }\n  ],\n  \"user\": {{ JSON.stringify($json.callerOid) }},\n  \"max_tokens\": 400,\n  \"temperature\": 0.4\n}",
-        "options": {
-          "timeout": 30000
-        }
+        ]
       },
-      "id": "call-aoai",
-      "name": "Call Azure OpenAI",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        680,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={ \"reply\": {{ JSON.stringify($json.choices[0].message.content) }} }",
-        "options": {}
+      "Get AOAI Token (WL identity)": {
+        "main": [
+          [
+            {
+              "node": "Call Azure OpenAI",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
       },
-      "id": "respond",
-      "name": "Respond to Webhook",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.1,
-      "position": [
-        900,
-        300
-      ]
-    }
-  ],
-  "connections": {
-    "Webhook": {
-      "main": [
-        [
-          {
-            "node": "Get AOAI Token (WL identity)",
-            "type": "main",
-            "index": 0
-          }
+      "Call Azure OpenAI": {
+        "main": [
+          [
+            {
+              "node": "Respond to Webhook",
+              "type": "main",
+              "index": 0
+            }
+          ]
         ]
-      ]
-    },
-    "Get AOAI Token (WL identity)": {
-      "main": [
-        [
-          {
-            "node": "Call Azure OpenAI",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Call Azure OpenAI": {
-      "main": [
-        [
-          {
-            "node": "Respond to Webhook",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      }
     }
   }
-}
+]

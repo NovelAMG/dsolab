@@ -55,11 +55,18 @@ spec:
             - --client-secret=$(OAUTH2_PROXY_CLIENT_SECRET)
             - --redirect-url=$(OAUTH2_PROXY_REDIRECT_URL)
             - --scope=openid email profile
-            # ── Upstreams: SPA at /, n8n at /webhook ────────────────
-            # NGINX Ingress sends ALL traffic to us, then we fan out by path.
-            # 1E-d update: added the SPA upstream for /  (used to be just n8n).
-            - --upstream=http://spa.n8n.svc.cluster.local/
-            - --upstream=http://n8n.n8n.svc.cluster.local:5678/webhook
+            # ── Pure auth-gate mode (1E-d fix) ──────────────────────
+            # We DON'T use --upstream anymore. Instead, NGINX Ingress routes
+            # paths directly to backends (SPA / n8n) and calls our /oauth2/auth
+            # endpoint as a subrequest via auth-url annotation. Why:
+            #   - oauth2-proxy's path-prefix matching for multiple upstreams
+            #     strips the matched prefix, so /webhook/chat got forwarded
+            #     to n8n as just "/" -> n8n 405 Method Not Allowed.
+            #   - auth-request mode is the canonical NGINX + oauth2-proxy
+            #     pattern. Less moving parts here, fewer surprises.
+            # The "upstream" we still need so oauth2-proxy can serve its OWN
+            # endpoints (/oauth2/start, /oauth2/callback, /oauth2/auth).
+            - --upstream=static://200
             - --http-address=0.0.0.0:4180
             # ── Cookie / session ─────────────────────────────────────
             - --cookie-secret=$(OAUTH2_PROXY_COOKIE_SECRET)

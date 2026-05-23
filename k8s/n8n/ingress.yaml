@@ -1,21 +1,51 @@
-# NGINX Ingress for n8n (via oauth2-proxy).
+# NGINX Ingress for the n8n stack.
 #
-# Traffic flow:
-#   Internet → 20.195.16.7:443 → NGINX Ingress (terminates TLS) →
-#     oauth2-proxy (auths) → n8n
+# Architecture (1E-d auth_request mode):
+#   Internet → 20.195.16.7:443 → NGINX (TLS, calls oauth2-proxy /oauth2/auth
+#                                       as subrequest, then routes by path):
 #
-# Key annotations:
-#   - cert-manager.io/cluster-issuer: triggers Let's Encrypt cert issuance
-#     via the issuer we applied in 1E-a (letsencrypt-staging).
-#   - nginx.ingress.kubernetes.io/proxy-body-size: n8n workflows can have
-#     large payloads; default 1m would 413 on uploads.
-#   - nginx.ingress.kubernetes.io/ssl-redirect: forces http -> https.
-#   - WebSocket support: NGINX Ingress detects upgrade headers automatically,
-#     no special annotation needed.
+#     /oauth2/*  → oauth2-proxy   (no auth check — login flow itself)
+#     /webhook/* → n8n :5678      (auth: cookie OR JWT bearer)
+#     /          → spa            (auth: cookie)
 #
-# Hostname is templated via scripts/07-deploy-oauth2-proxy.sh because it
-# depends on the runtime ingress IP (chat.<IP>.nip.io). The script does an
-# `envsubst` before applying.
+# We deliberately split this into TWO Ingress resources sharing one hostname.
+# Why: nginx-ingress applies annotations PER-INGRESS, not per-path. Putting
+# auth-url on a single Ingress would force the /oauth2/* login flow itself
+# to require auth → infinite loop. Two Ingresses lets us skip auth on
+# /oauth2/* while gating everything else.
+#
+# Hostname is templated by scripts/07-deploy-oauth2-proxy.sh via envsubst.
+
+# ── Ingress #1: /oauth2/* (no auth required, it IS the login flow) ──────
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: n8n-oauth2
+  namespace: n8n
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-staging
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "32k"
+    nginx.ingress.kubernetes.io/proxy-buffers-number: "4"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - ${INGRESS_HOST}
+      secretName: n8n-tls
+  rules:
+    - host: ${INGRESS_HOST}
+      http:
+        paths:
+          - path: /oauth2
+            pathType: Prefix
+            backend:
+              service:
+                name: oauth2-proxy
+                port:
+                  number: 4180
+---
+# ── Ingress #2: /webhook/* + /  (auth-gated via subrequest) ─────────────
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -23,24 +53,43 @@ metadata:
   namespace: n8n
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-staging
-    nginx.ingress.kubernetes.io/proxy-body-size: "32m"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600" # 1h for long-running workflow executions
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "32m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    # Buffer size for Entra session cookie chunks (~8 cookies × ~3.5 KiB).
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "32k"
+    nginx.ingress.kubernetes.io/proxy-buffers-number: "4"
+    # ── auth_request via subrequest ──
+    # auth-url MUST be a literal URL (no nginx vars at admission time).
+    # Internal service URL keeps the subrequest in-cluster (fast, no TLS).
+    nginx.ingress.kubernetes.io/auth-url: "http://oauth2-proxy.n8n.svc.cluster.local:4180/oauth2/auth"
+    # auth-signin is rendered at request time (so $escaped_request_uri works);
+    # the literal hostname here is what the browser gets redirected TO.
+    nginx.ingress.kubernetes.io/auth-signin: "https://${INGRESS_HOST}/oauth2/start?rd=$escaped_request_uri"
+    # Forward identity headers from oauth2-proxy to upstreams.
+    nginx.ingress.kubernetes.io/auth-response-headers: "X-Auth-Request-User,X-Auth-Request-Email,Authorization"
 spec:
   ingressClassName: nginx
   tls:
     - hosts:
         - ${INGRESS_HOST}
-      secretName: n8n-tls # cert-manager will populate this Secret with the cert
+      secretName: n8n-tls
   rules:
     - host: ${INGRESS_HOST}
       http:
         paths:
+          - path: /webhook
+            pathType: Prefix
+            backend:
+              service:
+                name: n8n
+                port:
+                  number: 5678
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: oauth2-proxy # NOT n8n directly — auth gate first
+                name: spa
                 port:
-                  number: 4180
+                  number: 80
