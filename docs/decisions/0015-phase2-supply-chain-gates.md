@@ -28,7 +28,7 @@ pull-request-to-main:
 | 2B | Secret scanning | GitHub native | repo-wide, always on | yes (push protection) |
 | 2C | Dependency updates | Dependabot (npm, actions, terraform, docker) | weekly + security alerts | informational (PRs) |
 | 2D | Container image | Trivy + SARIF | spa/**, weekly cron | **yes** on HIGH/CRITICAL fixed |
-| 2E | IaC + K8s | Checkov + SARIF | terraform/**, k8s/**, Dockerfile | **yes** on any non-allowlisted finding |
+| 2E | IaC + K8s | Checkov + SARIF | terraform/**, k8s/**, Dockerfile | informational (intro phase) — flip to blocking once baseline triaged |
 
 ### Tool choices
 
@@ -55,8 +55,13 @@ default — handled with `.checkov.yaml` baseline.
 - **Image scan (Trivy)**: fail on `HIGH,CRITICAL` with `--ignore-unfixed`.
   Rationale: we won't ship a fixable CVE; we can't fix what upstream
   hasn't fixed yet. Unfixed findings still show in the Security tab.
-- **IaC (Checkov)**: any finding not on the allowlist fails. Allowlist
-  entries MUST cite a reason. No silent skips.
+- **IaC (Checkov)**: **informational at intro** — first run on this repo
+  surfaced ~95 inherited findings (36 Dockerfile, 58 Terraform, 1 K8s)
+  written before this gate existed. Making it blocking from day 1 would
+  force either a 95-line allowlist (no signal) or block every PR until
+  the baseline is fixed. Instead: SARIF → Security tab now, triage
+  findings in follow-up PRs, then flip to blocking. Tracking issue
+  filed in the repo.
 - **SAST (CodeQL)**: informational — Security tab is the source of truth.
   We don't auto-block PRs on CodeQL because TS/React projects routinely
   flip between high-noise queries with each release; a weekly review

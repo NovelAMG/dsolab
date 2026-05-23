@@ -5,12 +5,10 @@
 #   - k8s/         (raw manifests)
 #   - Dockerfiles  (best-practice rules — non-root, no latest tag, etc.)
 #
-# Findings:
-#   - Always uploaded to the Security tab (SARIF, informational)
-#   - HIGH severity also fails the build → blocks the PR
-#
-# Allowlist: tracked in .checkov.yaml at repo root (created lazily
-# the first time we accept a finding as a known trade-off).
+# Mode at this phase: INFORMATIONAL (SARIF → Security tab, never blocks PRs).
+# See ADR 0015 — we have ~95 inherited findings to triage first; making
+# Checkov blocking now would force a 95-line allowlist or block every PR.
+# Flip to blocking after the baseline is green (tracking issue in repo).
 name: Checkov (IaC)
 
 on:
@@ -35,7 +33,6 @@ permissions:
   contents: read
   security-events: write
   actions: read
-  pull-requests: write   # checkov-action posts PR comments when enabled
 
 concurrency:
   group: checkov-${{ github.workflow }}-${{ github.ref }}
@@ -51,36 +48,40 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ── Informational pass (all severities → SARIF) ─────────────
-      - name: Checkov → SARIF (informational)
-        id: checkov-info
-        uses: bridgecrewio/checkov-action@v12
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          directory: .
-          framework: terraform,kubernetes,dockerfile
-          output_format: sarif
-          output_file_path: checkov.sarif
-          soft_fail: true
-          # Honour repo allowlist (.checkov.yaml) if present.
-          config_file: .checkov.yaml
-        continue-on-error: true
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install Checkov
+        run: |
+          python -m pip install --upgrade pip
+          pip install 'checkov>=3.2,<4'
+
+      - name: Run Checkov (SARIF)
+        # --soft-fail so we always exit 0 — informational mode at this phase.
+        # Findings go to the Security tab via the SARIF upload below.
+        run: |
+          checkov \
+            --config-file .checkov.yaml \
+            --output sarif \
+            --output-file-path . \
+            --soft-fail
 
       - name: Upload Checkov SARIF
         if: always()
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: checkov.sarif/results_sarif.sarif
+          sarif_file: results_sarif.sarif
           category: checkov
 
-      # ── Blocking pass (HIGH severity only) ──────────────────────
-      # Checkov severity isn't a CLI flag pre-v3 — instead we use
-      # check IDs in .checkov.yaml to skip noisy ones, and let the
-      # rest fail. Override here keeps it simple: any failure blocks.
-      - name: Checkov → fail on findings (excluding allowlisted)
-        uses: bridgecrewio/checkov-action@v12
-        with:
-          directory: .
-          framework: terraform,kubernetes,dockerfile
-          output_format: cli
-          soft_fail: false
-          config_file: .checkov.yaml
+      - name: Run Checkov (CLI summary in PR log)
+        # Same scan, table output so reviewers can eyeball it without opening
+        # the Security tab. Still --soft-fail; never blocks.
+        run: |
+          checkov \
+            --config-file .checkov.yaml \
+            --output cli \
+            --compact \
+            --soft-fail

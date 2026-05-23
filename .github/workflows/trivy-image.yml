@@ -74,7 +74,7 @@ jobs:
       # ── Step 1: SARIF upload (all findings, all severities) ─────
       # Non-blocking. Feeds the Security tab so we can see trends.
       - name: Trivy → SARIF (informational)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: spa:ci-scan
           format: sarif
@@ -95,7 +95,7 @@ jobs:
 
       # ── Step 2: Blocking gate (HIGH/CRITICAL only) ──────────────
       - name: Trivy → fail on HIGH/CRITICAL
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: spa:ci-scan
           format: table
