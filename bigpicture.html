@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DevSecOps Lab — Big Picture</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+  const theme = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'default' : 'dark';
+  mermaid.initialize({ startOnLoad: true, theme: theme, securityLevel: 'loose' });
+</script>
+<style>
+:root {
+  --bg: #0f1419;
+  --panel: #161b22;
+  --panel-2: #1f2733;
+  --text: #e6edf3;
+  --muted: #8b949e;
+  --accent: #58a6ff;
+  --accent-2: #7ee787;
+  --warn: #f0883e;
+  --danger: #ff7b72;
+  --border: #30363d;
+  --code-bg: #0d1117;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #ffffff; --panel: #f6f8fa; --panel-2: #eaeef2; --text: #1f2328;
+    --muted: #656d76; --accent: #0969da; --accent-2: #1a7f37; --warn: #bc4c00;
+    --danger: #cf222e; --border: #d0d7de; --code-bg: #f6f8fa;
+  }
+}
+* { box-sizing: border-box; }
+html, body { background: var(--bg); color: var(--text); margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  font-size: 15px; line-height: 1.65;
+  max-width: 980px; margin: 0 auto; padding: 32px 24px 64px;
+}
+h1 { font-size: 30px; margin: 0 0 8px; }
+h2 { font-size: 22px; margin: 40px 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); color: var(--accent); }
+h3 { font-size: 17px; margin: 24px 0 8px; color: var(--accent-2); }
+p { margin: 10px 0; }
+.subtitle { color: var(--muted); margin-bottom: 24px; font-size: 16px; }
+.kicker { font-size: 14px; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+code { background: var(--code-bg); padding: 2px 6px; border-radius: 4px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 13px; color: var(--accent-2); }
+pre { background: var(--code-bg); padding: 12px; border-radius: 6px; overflow-x: auto; border: 1px solid var(--border); }
+pre code { background: none; padding: 0; color: var(--text); }
+table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 14px; }
+th, td { border: 1px solid var(--border); padding: 10px 14px; text-align: left; vertical-align: top; }
+th { background: var(--panel-2); font-weight: 600; }
+tr:nth-child(even) td { background: var(--panel); }
+ul, ol { padding-left: 24px; }
+li { margin: 6px 0; }
+.callout { background: var(--panel); border-left: 4px solid var(--accent); padding: 14px 18px; border-radius: 4px; margin: 20px 0; }
+.callout.tip { border-color: var(--accent-2); }
+.callout.warn { border-color: var(--warn); }
+.mermaid {
+  background: var(--panel);
+  padding: 20px;
+  border-radius: 8px;
+  margin: 20px 0;
+  text-align: center;
+  border: 1px solid var(--border);
+  overflow-x: auto;
+}
+.mermaid svg { max-width: 100%; height: auto; }
+hr { border: none; border-top: 1px solid var(--border); margin: 36px 0; }
+.tag-set { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.tag { background: var(--panel-2); padding: 3px 10px; border-radius: 3px; font-size: 12px; color: var(--muted); }
+.q { font-style: italic; color: var(--muted); margin: 6px 0; }
+@media print {
+  body { max-width: none; padding: 0; color: #000; background: #fff; }
+  h2 { page-break-before: always; }
+  .mermaid { page-break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+
+<p class="kicker">DevSecOps Lab · Conceptual primer</p>
+<h1>The big picture — in plain English</h1>
+<p class="subtitle">Read this once. You'll have the mental model for every phase that follows.</p>
+
+<h2>The big picture — three places things live</h2>
+
+<div class="mermaid">
+flowchart LR
+    subgraph LAPTOP["🖥️ Your laptop"]
+        FILES[Files on disk<br/>~/Desktop/DevSecOps-True]
+        GIT[Local git repo]
+        AZCLI[az CLI<br/>talks to Azure directly]
+        FILES --> GIT
+    end
+
+    subgraph GITHUB["☁️ GitHub<br/>github.com/tonzking123/dsolab"]
+        REMOTE[Remote git repo<br/>everyone sees this]
+        ACTIONS[GitHub Actions<br/>= the CI/CD robot]
+        REMOTE -.->|triggers| ACTIONS
+    end
+
+    subgraph AZURE["☁️ Azure subscription"]
+        RG[Resource group<br/>rg-dsolab-sea]
+        AKS_R[AKS cluster]
+        AOAI_R[Azure OpenAI]
+        KV_R[Key Vault]
+        ETC[ACR, Postgres,<br/>Log Analytics, ...]
+    end
+
+    GIT -->|git push| REMOTE
+    REMOTE -->|git pull| GIT
+    AZCLI -->|create things directly| RG
+    ACTIONS -->|create things via OIDC| RG
+</div>
+
+<p>Three layers. Code lives on your laptop. <b>Pushed</b> to GitHub. <b>GitHub creates things</b> in Azure on your behalf. That's the whole flow.</p>
+
+<h2>Why bother with GitHub creating things — why not just click in the portal?</h2>
+
+<p>This is <em>the</em> key idea behind DevOps. Three reasons:</p>
+<ol>
+  <li><b>Repeatable</b> — if you click in the portal, no one else can repeat exactly what you did. With code in GitHub, anyone (or any robot) can recreate the same setup with one command.</li>
+  <li><b>Reviewable</b> — every change is a "pull request" (PR). You see exactly what's about to change before it changes. Like a security review, but for infrastructure.</li>
+  <li><b>Audit-able</b> — <code>git log</code> shows every change ever made, who made it, when, and why. Same as audit logs, but for cloud config.</li>
+</ol>
+<p>The cost: you have to learn the developer tooling (<code>git</code>, <code>terraform</code>, <code>gh</code>). That's what these phases are teaching you.</p>
+
+<h2>The 4 actors — who does what</h2>
+
+<div class="mermaid">
+flowchart TB
+    U["👤 You<br/>Thobthuan"]
+    GHA["🤖 GitHub Actions workflow<br/>a script running in GitHub's cloud"]
+    MI["🪪 Managed Identity<br/>mi-gha-dsolab<br/>a cryptographic identity in Azure"]
+    TF["📋 Terraform<br/>a CLI program"]
+    AZ[☁️ Azure]
+
+    U -->|writes code, opens PRs| GHA
+    U -->|manual setup once| AZ
+    GHA -->|logs in AS| MI
+    MI -->|allowed to create things| AZ
+    GHA -->|runs| TF
+    TF -->|tells Azure what to create| AZ
+</div>
+
+<table>
+<thead><tr><th>Actor</th><th>What it is</th><th>What it does</th></tr></thead>
+<tbody>
+<tr><td><b>You</b></td><td>A human with <code>az</code>, <code>gh</code>, <code>git</code> CLIs</td><td>Write code, review PRs, do <b>one-time setup</b> (bootstrap script)</td></tr>
+<tr><td><b>GitHub Actions</b></td><td>A robot that lives in GitHub. Runs scripts when you push code</td><td>Calls Terraform whenever code changes</td></tr>
+<tr><td><b>Managed Identity (<code>mi-gha-dsolab</code>)</b></td><td>An identity in Azure with <b>no password</b> — only proves itself via OIDC tokens</td><td>The identity GitHub Actions "becomes" when it talks to Azure</td></tr>
+<tr><td><b>Terraform</b></td><td>A CLI program that reads <code>.tf</code> files and tells Azure "make it look like this"</td><td>The thing that actually creates AKS, ACR, etc.</td></tr>
+</tbody>
+</table>
+
+<div class="callout">
+<b>The critical concept</b>: GitHub Actions doesn't have Azure permissions on its own. It can only do things in Azure <b>as the Managed Identity</b>. The MI is what's authorized — GitHub Actions just borrows its identity for ~10 minutes per workflow run, using a cryptographic handshake called <b>OIDC</b> (no passwords ever).
+</div>
+
+<h2>Bootstrap vs Terraform — the two setup phases</h2>
+
+<p>This is the part everyone gets confused about. There are <b>two kinds of setup</b>:</p>
+
+<div class="mermaid">
+flowchart LR
+    subgraph PHASE_A["Phase A: Bootstrap — you, by hand, ONCE"]
+        B1[Run scripts/00-bootstrap-state.sh]
+        B2[Creates: state storage,<br/>GHA managed identity,<br/>RBAC role assignments]
+        B3[Sets: GitHub repo variables<br/>so workflows know who to login as]
+        B1 --> B2 --> B3
+    end
+
+    subgraph PHASE_B["Phase B: Terraform — the robot, EVERY change"]
+        T1[You edit a .tf file]
+        T2[git push → PR → merge]
+        T3[GitHub Actions runs terraform apply]
+        T4[Creates: AKS, ACR, KV,<br/>AOAI, Postgres, etc.]
+        T1 --> T2 --> T3 --> T4
+    end
+
+    PHASE_A -->|enables| PHASE_B
+</div>
+
+<p><b>Bootstrap</b> = "Build the trust foundation so the robot can take over." You do this once, manually, because:</p>
+<ul>
+  <li>You need an Azure account first (chicken-and-egg — Terraform can't create the identity it logs in as).</li>
+  <li>You need a place to store Terraform's state file (chicken-and-egg again — Terraform can't store its own state without a place that already exists).</li>
+  <li>These are <b>one-time</b> setup items that never change.</li>
+</ul>
+
+<p><b>Terraform</b> = "The robot's job description." Everything else lives here. AKS, ACR, Key Vault, Postgres, OpenAI, role assignments between them, network rules — all written as code in <code>.tf</code> files. The robot reads the code and makes Azure match.</p>
+
+<h2>What we've actually built so far — and <em>why</em></h2>
+
+<p>Resources in your <code>rg-dsolab-sea</code> resource group:</p>
+
+<table>
+<thead><tr><th>Resource</th><th>Created by</th><th>Why it exists</th></tr></thead>
+<tbody>
+<tr><td><code>stdsolabtfstate1db4</code><br/>(Storage Account)</td><td>Bootstrap</td><td>Holds Terraform's "state file" — Terraform's memory of what it's already created. Without this, Terraform would re-create everything every run.</td></tr>
+<tr><td><code>mi-gha-dsolab</code><br/>(Managed Identity)</td><td>Bootstrap</td><td>The identity GitHub Actions logs in as. Cryptographic, no password.</td></tr>
+<tr><td><code>aks-dsolab-sea</code><br/>(AKS cluster)</td><td>Terraform</td><td>Where n8n + SPA + oauth2-proxy will eventually run as containers.</td></tr>
+<tr><td><code>acrdsolabxsqb</code><br/>(Container Registry)</td><td>Terraform</td><td>Stores Docker images we'll build later (the SPA image).</td></tr>
+<tr><td><code>kv-dsolab-sea-xsqb</code><br/>(Key Vault)</td><td>Terraform</td><td>Holds secrets (e.g., the Postgres password).</td></tr>
+<tr><td><code>log-dsolab-sea</code><br/>(Log Analytics)</td><td>Terraform</td><td>Receives logs from AKS and other services.</td></tr>
+<tr><td><code>aoai-dsolab-aue</code><br/>(Azure OpenAI in AustraliaEast)</td><td>Terraform</td><td>The GPT-4o model the AI agent will call. In AUE because GPT-4o capacity is reliable there, not in SEA.</td></tr>
+<tr><td><code>psql-dsolab-sea-xsqb</code><br/>(Postgres Flex)</td><td>Terraform</td><td>n8n's database.</td></tr>
+</tbody>
+</table>
+
+<p><b>None of these run any actual app yet.</b> They're just the infrastructure — the empty stage. The actors (n8n, the SPA, the AI workflow) move onto the stage in Phases 1D, 1E, 1F.</p>
+
+<h2>What is Terraform doing, in 4 words?</h2>
+
+<p style="font-size: 22px; text-align: center; padding: 16px;"><b>"Make reality match code."</b></p>
+
+<p>That's it. You write <code>.tf</code> files saying "I want an AKS cluster called this, with 2 nodes of size Standard_B2s, in southeastasia." Terraform:</p>
+<ol>
+  <li><b>Reads</b> your <code>.tf</code> files → knows what you want ("desired state").</li>
+  <li><b>Reads</b> Azure → knows what's already there ("actual state").</li>
+  <li><b>Diffs</b> the two → produces a "plan" listing every change needed.</li>
+  <li><b>Applies</b> the plan → calls Azure APIs to create / modify / delete until actual = desired.</li>
+</ol>
+<p>It's like a security baseline scanner. But instead of just reporting drift, it <em>fixes</em> it automatically.</p>
+
+<div class="mermaid">
+flowchart LR
+    TFCODE[.tf files<br/>'desired state']
+    STATE[(state file<br/>'last known reality')]
+    AZ[Azure<br/>'current reality']
+
+    TFCODE -->|compared with| DIFF{Plan}
+    STATE -->|compared with| DIFF
+    AZ -->|compared with| DIFF
+    DIFF -->|apply| AZ
+    DIFF -->|update| STATE
+</div>
+
+<h2>What is GitHub Actions doing, in 1 sentence?</h2>
+
+<p style="font-size: 22px; text-align: center; padding: 16px;"><b>"When code changes, run this script."</b></p>
+
+<p>Each <code>.yml</code> file in <code>.github/workflows/</code> is a recipe. When a trigger happens (push, PR, schedule), GitHub runs the recipe on a fresh VM. Recipes we have:</p>
+
+<table>
+<thead><tr><th>Workflow</th><th>Trigger</th><th>What it does</th></tr></thead>
+<tbody>
+<tr><td><code>hello-world.yml</code></td><td>Manual or when itself changes</td><td>Logs into Azure, prints subscription info. Proves OIDC works.</td></tr>
+<tr><td><code>tf-plan.yml</code></td><td>Any PR touching <code>terraform/</code></td><td>Runs <code>terraform plan</code> (read-only), posts result as a comment on the PR</td></tr>
+<tr><td><code>tf-apply.yml</code></td><td>Merge to <code>main</code> touching <code>terraform/</code></td><td>Runs <code>terraform apply</code> (actually makes changes in Azure)</td></tr>
+</tbody>
+</table>
+
+<h2>End-to-end flow of one change</h2>
+
+<p>Let's trace what happened when you ran <code>gh pr merge 3</code> to fix the KV admin issue:</p>
+
+<div class="mermaid">
+sequenceDiagram
+    participant U as 👤 You
+    participant L as 💻 Laptop
+    participant GH as ☁️ GitHub
+    participant GHA as 🤖 GitHub Actions
+    participant MI as 🪪 mi-gha-dsolab
+    participant AZ as ☁️ Azure
+
+    U->>L: Edit terraform/modules/keyvault/main.tf
+    U->>L: git commit
+    U->>GH: git push origin fix/1b2-...
+    U->>GH: gh pr create
+    GH->>GHA: PR opened → trigger tf-plan workflow
+    GHA->>GHA: Spin up Ubuntu VM
+    GHA->>MI: "I'm the workflow from this PR, give me a token"
+    Note over GHA,MI: OIDC handshake — no password
+    MI-->>GHA: Here's a 1-hour Azure token
+    GHA->>AZ: terraform plan using token
+    AZ-->>GHA: "These changes: 0 add, 1 change, 0 destroy"
+    GHA->>GH: Post plan as PR comment
+    U->>GH: Reviews plan, clicks Merge
+    GH->>GHA: Merge to main → trigger tf-apply workflow
+    GHA->>MI: Get a new token
+    MI-->>GHA: Token
+    GHA->>AZ: terraform apply
+    AZ->>AZ: Update AKS cluster — remove Defender block
+    AZ-->>GHA: Done
+    GHA-->>GH: Workflow green ✓
+</div>
+
+<p><b>No passwords, no secrets, no manual portal clicks.</b> That's the whole DevOps win.</p>
+
+<h2>Why this is <em>more</em> secure, not less</h2>
+
+<p>A security person's instinct: "But running scripts in GitHub on my Azure is scary." Actually it's the opposite. Compare:</p>
+
+<table>
+<thead><tr><th>Old way (click in portal)</th><th>DevOps way (this lab)</th></tr></thead>
+<tbody>
+<tr>
+  <td>Permissions held by humans → human leaves company, perms might survive</td>
+  <td>Permissions held by an identity scoped to one repo. Repo deleted = identity becomes useless</td>
+</tr>
+<tr>
+  <td>Changes have no audit trail beyond Azure activity log</td>
+  <td>Every change has a git commit, a PR, a reviewer, a timestamp, a reason</td>
+</tr>
+<tr>
+  <td>Drift between dev/staging/prod is normal</td>
+  <td>Drift is <em>forbidden</em> — TF re-asserts desired state every run</td>
+</tr>
+<tr>
+  <td>Secrets stored in keyvaults, accessed by passwords</td>
+  <td>No passwords anywhere. OIDC + workload identity from day 1</td>
+</tr>
+<tr>
+  <td>Security review = "ask the team what they did"</td>
+  <td>Security review = "read the PR diff"</td>
+</tr>
+</tbody>
+</table>
+
+<h2>Glossary — every word you've seen, in 1 line</h2>
+
+<table>
+<thead><tr><th>Term</th><th>What it means</th></tr></thead>
+<tbody>
+<tr><td><b>Repo / Repository</b></td><td>A folder with version history. Lives in GitHub.</td></tr>
+<tr><td><b>Commit</b></td><td>A snapshot of files at a point in time.</td></tr>
+<tr><td><b>Branch</b></td><td>A parallel timeline. <code>main</code> is the trunk; <code>infra/02-...</code> is a feature branch.</td></tr>
+<tr><td><b>Push</b></td><td>Upload commits from your laptop to GitHub.</td></tr>
+<tr><td><b>Pull</b></td><td>Download commits from GitHub to your laptop.</td></tr>
+<tr><td><b>PR (pull request)</b></td><td>"Hey, please review and merge my branch into main."</td></tr>
+<tr><td><b>Merge</b></td><td>Combine a branch into main.</td></tr>
+<tr><td><b>CI/CD</b></td><td>"Continuous Integration / Delivery." Robots automate build + deploy. GitHub Actions is one.</td></tr>
+<tr><td><b>Workflow</b></td><td>A <code>.yml</code> recipe in <code>.github/workflows/</code> that the CI robot runs.</td></tr>
+<tr><td><b>OIDC</b></td><td>A cryptographic handshake. GitHub proves "this is my workflow" to Azure. Azure trusts that proof.</td></tr>
+<tr><td><b>Managed Identity (MI)</b></td><td>An Azure-native identity with no password. Used by services and workflows.</td></tr>
+<tr><td><b>Federated Credential (FIC)</b></td><td>Config on an MI saying "trust OIDC tokens issued by GitHub for this specific repo."</td></tr>
+<tr><td><b>IaC (Infra as Code)</b></td><td>Describing cloud setup in files instead of clicking. Terraform is IaC.</td></tr>
+<tr><td><b>Terraform</b></td><td>The most popular IaC tool. CLI program.</td></tr>
+<tr><td><b>Provider</b></td><td>A plugin telling Terraform how to talk to one cloud (we use <code>azurerm</code>).</td></tr>
+<tr><td><b>Module</b></td><td>A reusable Terraform package (e.g., <code>modules/aks/</code>).</td></tr>
+<tr><td><b>State</b></td><td>Terraform's memory of what already exists. Stored in our case in Azure Storage.</td></tr>
+<tr><td><b>Plan</b></td><td>A diff: "this is what I'd change." Read-only.</td></tr>
+<tr><td><b>Apply</b></td><td>Actually make the changes.</td></tr>
+<tr><td><b>Resource group (RG)</b></td><td>A folder in Azure that holds related resources.</td></tr>
+<tr><td><b>AKS</b></td><td>Azure Kubernetes Service. Managed Kubernetes.</td></tr>
+<tr><td><b>ACR</b></td><td>Azure Container Registry. Stores Docker images.</td></tr>
+<tr><td><b>KV</b></td><td>Key Vault. Stores secrets / certs / keys.</td></tr>
+<tr><td><b>AOAI</b></td><td>Azure OpenAI. Where GPT-4o lives.</td></tr>
+<tr><td><b>Bootstrap</b></td><td>One-time human-driven setup that enables the automated stuff.</td></tr>
+<tr><td><b>ADR</b></td><td>Architecture Decision Record. A <code>.md</code> file in <code>docs/decisions/</code> explaining <em>why</em> we made a choice.</td></tr>
+</tbody>
+</table>
+
+<h2>Why we ran into trouble (the 3 errors of yesterday)</h2>
+
+<p>All 3 errors had the same root cause: <b>the MI's permissions and Terraform's view of reality got out of sync</b>. Now you have the mental model to understand exactly what each was:</p>
+
+<table>
+<thead><tr><th>Error</th><th>Plain English</th></tr></thead>
+<tbody>
+<tr><td><b>Plan failed with "register RP"</b></td><td>Terraform tried to register Azure features at subscription level. Our MI is only RG-level. Fix: register them by hand (you, as Owner) and tell Terraform to skip auto-registration.</td></tr>
+<tr><td><b>Apply failed with "RoleAssignmentExists 409"</b></td><td>Terraform tried to create a role assignment, but a duplicate one was already there from yesterday's manual fix. Terraform can't see things it doesn't manage.</td></tr>
+<tr><td><b>Apply failed with "cluster not in Running state"</b></td><td>AKS was stopped (cost-saving). Terraform tried to update it. Azure refuses updates while stopped. Fix: start AKS before applying.</td></tr>
+</tbody>
+</table>
+
+<p>All three are <b>classic DevOps lessons</b>. You hit them in 24 hours of real work. Most people learn these over months. You're ahead.</p>
+
+<hr>
+
+<p style="color: var(--muted); font-size: 13px; text-align: center;">DevSecOps Lab · Conceptual primer · Render this in a browser to see all Mermaid diagrams</p>
+
+</body>
+</html>
