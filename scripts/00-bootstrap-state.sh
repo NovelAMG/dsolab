@@ -180,11 +180,18 @@ CONTAINER_SCOPE="${SA_ID}/blobServices/default/containers/${STATE_CONTAINER}"
 assign_role "Contributor" "$RG_SCOPE"
 assign_role "User Access Administrator" "$RG_SCOPE"
 assign_role "Key Vault Administrator" "$RG_SCOPE"
+# Storage Blob Data Contributor at BOTH scopes:
+#   - container scope: needed for read/write of state blobs
+#   - SA scope: required by the AzureRM backend's `ListBlobs` call during `terraform init`
+# Granting at container scope alone causes recurring 403 ListBlobs failures in tf-plan.
+# See ADR 0010.
 assign_role "Storage Blob Data Contributor" "$CONTAINER_SCOPE"
+assign_role "Storage Blob Data Contributor" "$SA_ID"
 
 # Also grant the current user Key Vault Administrator on the RG (matches MI),
-# and Blob Data Contributor on the state container (for local `terraform` runs).
-# Without these, the human can't read KV secrets created by TF (ADR 0008).
+# and Blob Data Contributor on both SA scope + container scope (for local `terraform` runs).
+# Without these, the human can't read KV secrets created by TF (ADR 0008) and
+# `terraform init` fails locally (ADR 0010).
 az role assignment create \
   --assignee-object-id "$USER_OBJECT_ID" \
   --assignee-principal-type User \
@@ -197,6 +204,13 @@ az role assignment create \
   --assignee-principal-type User \
   --role "Storage Blob Data Contributor" \
   --scope "$CONTAINER_SCOPE" \
+  --output none 2>/dev/null || true
+
+az role assignment create \
+  --assignee-object-id "$USER_OBJECT_ID" \
+  --assignee-principal-type User \
+  --role "Storage Blob Data Contributor" \
+  --scope "$SA_ID" \
   --output none 2>/dev/null || true
 
 # ---------- 6. Set GitHub repo variables ----------
