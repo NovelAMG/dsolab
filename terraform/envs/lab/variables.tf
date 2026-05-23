@@ -48,3 +48,23 @@ variable "human_admin_object_id" {
   type        = string
   default     = null
 }
+
+# ───── Phase 1D inputs (set by scripts/02-create-entra-apps.sh) ─────
+
+variable "spa_app_id" {
+  description = "SPA app reg client ID (Phase 1E uses this for MSAL config). Set via TF_VAR or GitHub repo variable SPA_APP_ID."
+  type        = string
+  default     = null
+}
+
+variable "n8n_api_app_id" {
+  description = "n8n-api app reg client ID. Set via TF_VAR or GitHub repo variable N8N_API_APP_ID."
+  type        = string
+  default     = null
+}
+
+variable "n8n_api_app_uri" {
+  description = "n8n-api Application ID URI (e.g. api://n8n-dsolab) — the audience oauth2-proxy validates. Set via TF_VAR or GitHub repo variable N8N_API_APP_URI."
+  type        = string
+  default     = null
+}
