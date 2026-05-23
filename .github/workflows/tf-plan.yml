@@ -74,7 +74,7 @@ jobs:
           tail -c 5000 plan.txt >> plan-trunc.txt || true
 
       - name: Post plan to PR
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');
