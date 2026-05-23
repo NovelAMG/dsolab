@@ -1,0 +1,107 @@
+# Trivy — container image vulnerability scan
+#
+# Phase 2D. Builds the SPA image exactly the way our deploy script
+# does (multi-stage, linux/amd64), then scans the final image for
+# OS-package CVEs and language-level dependency CVEs.
+#
+# Policy:
+#   - severity: HIGH, CRITICAL  (LOW/MEDIUM go to the Security tab via SARIF)
+#   - ignore-unfixed: true      (we can't fix what upstream hasn't fixed yet)
+#   - exit-code 1 on findings  → blocks the PR
+#
+# Why Trivy (not Defender CLI) at this phase:
+#   - Trivy runs entirely in CI with no Azure dependency. Fast feedback,
+#     no plan toggle, no MI to configure.
+#   - Defender for Containers (registry scan) joins us in Phase 3 as a
+#     second line of defence on already-pushed images.
+name: Trivy (image scan)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'spa/**'
+      - '.github/workflows/trivy-image.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'spa/**'
+      - '.github/workflows/trivy-image.yml'
+  schedule:
+    # Weekly Monday 03:00 UTC — re-scan main against today's CVE DB
+    # even if the image bits haven't changed.
+    - cron: '0 3 * * 1'
+
+permissions:
+  contents: read
+  security-events: write   # upload SARIF to Code Scanning
+  actions: read
+
+concurrency:
+  group: trivy-image-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    name: Build SPA + Trivy scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build SPA image (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./spa
+          file: ./spa/Dockerfile
+          push: false
+          load: true                 # load into local docker daemon so Trivy can scan it
+          platforms: linux/amd64
+          tags: spa:ci-scan
+          # SPA build args match scripts/08-build-and-push-spa.sh — placeholders
+          # are fine for CI because we're only scanning the image, not running it.
+          build-args: |
+            VITE_SPA_CLIENT_ID=00000000-0000-0000-0000-000000000000
+            VITE_TENANT_ID=00000000-0000-0000-0000-000000000000
+            VITE_N8N_API_SCOPE=api://placeholder/access_as_user
+            VITE_REDIRECT_URI=https://placeholder.example/
+
+      # ── Step 1: SARIF upload (all findings, all severities) ─────
+      # Non-blocking. Feeds the Security tab so we can see trends.
+      - name: Trivy → SARIF (informational)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: spa:ci-scan
+          format: sarif
+          output: trivy-image.sarif
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: LOW,MEDIUM,HIGH,CRITICAL
+        env:
+          # Cache the vuln DB across runs (faster, kinder to ghcr).
+          TRIVY_CACHE_DIR: .cache/trivy
+
+      - name: Upload SARIF to Code Scanning
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-image.sarif
+          category: trivy-image
+
+      # ── Step 2: Blocking gate (HIGH/CRITICAL only) ──────────────
+      - name: Trivy → fail on HIGH/CRITICAL
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: spa:ci-scan
+          format: table
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+        env:
+          TRIVY_CACHE_DIR: .cache/trivy

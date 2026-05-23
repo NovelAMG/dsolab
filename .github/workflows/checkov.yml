@@ -1,0 +1,86 @@
+# Checkov — IaC + Kubernetes manifest static analysis
+#
+# Phase 2E. Scans:
+#   - terraform/   (Azure provider — VNets, AKS, ACR, KV, etc.)
+#   - k8s/         (raw manifests)
+#   - Dockerfiles  (best-practice rules — non-root, no latest tag, etc.)
+#
+# Findings:
+#   - Always uploaded to the Security tab (SARIF, informational)
+#   - HIGH severity also fails the build → blocks the PR
+#
+# Allowlist: tracked in .checkov.yaml at repo root (created lazily
+# the first time we accept a finding as a known trade-off).
+name: Checkov (IaC)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'terraform/**'
+      - 'k8s/**'
+      - 'spa/Dockerfile'
+      - '.checkov.yaml'
+      - '.github/workflows/checkov.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'terraform/**'
+      - 'k8s/**'
+      - 'spa/Dockerfile'
+      - '.checkov.yaml'
+      - '.github/workflows/checkov.yml'
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+  pull-requests: write   # checkov-action posts PR comments when enabled
+
+concurrency:
+  group: checkov-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    name: Checkov scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── Informational pass (all severities → SARIF) ─────────────
+      - name: Checkov → SARIF (informational)
+        id: checkov-info
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: .
+          framework: terraform,kubernetes,dockerfile
+          output_format: sarif
+          output_file_path: checkov.sarif
+          soft_fail: true
+          # Honour repo allowlist (.checkov.yaml) if present.
+          config_file: .checkov.yaml
+        continue-on-error: true
+
+      - name: Upload Checkov SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: checkov.sarif/results_sarif.sarif
+          category: checkov
+
+      # ── Blocking pass (HIGH severity only) ──────────────────────
+      # Checkov severity isn't a CLI flag pre-v3 — instead we use
+      # check IDs in .checkov.yaml to skip noisy ones, and let the
+      # rest fail. Override here keeps it simple: any failure blocks.
+      - name: Checkov → fail on findings (excluding allowlisted)
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: .
+          framework: terraform,kubernetes,dockerfile
+          output_format: cli
+          soft_fail: false
+          config_file: .checkov.yaml

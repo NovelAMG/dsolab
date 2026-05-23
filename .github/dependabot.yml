@@ -1,0 +1,93 @@
+# Dependabot config — Phase 2 (supply-chain security)
+#
+# Covers the 4 dependency ecosystems we actually use:
+#   1. npm        → SPA (spa/package.json)
+#   2. github-actions → workflow action versions
+#   3. terraform  → providers + modules under terraform/
+#   4. docker     → base images in Dockerfiles
+#
+# Strategy: weekly schedule (lab repo, no need for daily noise),
+# grouped minor/patch updates to keep PR count low, security
+# updates are always opened separately (controlled by repo
+# "Dependabot security updates" toggle, enabled via gh api).
+
+version: 2
+updates:
+
+  # ── SPA (TypeScript/React) ──────────────────────────────────────
+  - package-ecosystem: npm
+    directory: /spa
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Asia/Bangkok
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - spa
+    commit-message:
+      prefix: chore(spa-deps)
+      include: scope
+    groups:
+      # Bundle non-major updates so we don't get 10 PRs/week.
+      spa-minor-patch:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch
+      # Security updates stay ungrouped so each CVE has its own PR.
+
+  # ── GitHub Actions used in this repo ────────────────────────────
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Asia/Bangkok
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - ci
+    commit-message:
+      prefix: chore(actions)
+      include: scope
+    groups:
+      actions-minor-patch:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch
+
+  # ── Terraform providers + modules ───────────────────────────────
+  - package-ecosystem: terraform
+    directory: /terraform/envs/lab
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Asia/Bangkok
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+      - terraform
+    commit-message:
+      prefix: chore(tf-deps)
+      include: scope
+
+  # ── Docker base images (SPA Dockerfile) ─────────────────────────
+  - package-ecosystem: docker
+    directory: /spa
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Asia/Bangkok
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+      - docker
+    commit-message:
+      prefix: chore(docker)
+      include: scope

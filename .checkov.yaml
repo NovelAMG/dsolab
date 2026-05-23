@@ -1,0 +1,36 @@
+# Checkov config — Phase 2 baseline allowlist
+#
+# Philosophy:
+#   - Start strict. Add a skip here ONLY when a finding is a deliberate
+#     trade-off documented in an ADR (or is irrelevant to a lab repo).
+#   - Each skip MUST cite a reason. No silent ignores.
+#
+# Reference: https://www.checkov.io/2.Basics/CLI%20Command%20Reference.html
+
+# Scan only the directories we own. (Public Terraform modules pulled
+# from registries would otherwise drown the report in third-party noise.)
+directory:
+  - terraform
+  - k8s
+  - spa
+
+framework:
+  - terraform
+  - kubernetes
+  - dockerfile
+
+# Don't try to graph-walk Terraform across env boundaries — our envs/
+# pattern means each env is self-contained.
+download-external-modules: false
+
+# Baseline skips — every one MUST have a reason comment.
+skip-check:
+  # CKV2_AZURE_ relations require the whole subscription state, which
+  # we don't pass to Checkov in a PR scan.
+  - CKV2_AZURE_8       # AKS log analytics — already enabled via diagnostic settings, false positive in PR scope
+  - CKV2_AZURE_10      # AKS azure policy add-on — enabled platform-wide (ADR 0001 notes Defender flow)
+
+  # K8s baseline relaxations for the lab (not for prod):
+  - CKV_K8S_21         # default namespace usage — we DO put workloads in proper namespaces, false positives on Job templates
+  - CKV_K8S_43         # image digest — we use semver tags in main; digests in Phase 3 once admission policy is on
+  - CKV_K8S_14         # latest tag — covered by CKV_K8S_43; same Phase 3 fix

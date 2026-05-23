@@ -1,0 +1,65 @@
+# CodeQL — Static Application Security Testing (SAST)
+#
+# Phase 2A. Analyses the SPA TypeScript source for known security
+# anti-patterns (XSS sinks, prototype pollution, hardcoded secrets,
+# insecure crypto, etc.). Findings appear in the repo's Security tab
+# under "Code scanning".
+#
+# Public repos get CodeQL free. We scan on PR + weekly cron so even
+# if nothing changes we catch newly-disclosed query updates.
+name: CodeQL (SAST)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'spa/**'
+      - '.github/workflows/codeql.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'spa/**'
+      - '.github/workflows/codeql.yml'
+  schedule:
+    # Weekly Monday 02:00 UTC = catch new CodeQL queries against
+    # unchanged code. Cheap.
+    - cron: '0 2 * * 1'
+
+permissions:
+  contents: read
+  security-events: write   # upload SARIF to Code Scanning
+  actions: read
+
+concurrency:
+  group: codeql-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: javascript-typescript
+            build-mode: none   # SPA is interpreted at scan time; no build needed for CodeQL
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          # security-extended adds queries beyond the default set
+          # (more findings, slightly more false-positives — fine for a lab).
+          queries: security-extended
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: '/language:${{ matrix.language }}'
