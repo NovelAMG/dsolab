@@ -92,18 +92,24 @@ helm repo update >/dev/null
 # ---------- 2. NGINX Ingress Controller ----------
 echo "[2/5] Installing NGINX Ingress Controller..."
 # - controller.service.type=LoadBalancer creates an Azure Public Load Balancer in the AKS node RG.
-# - controller.replicaCount=2 for cheap HA on our 2-node B2s cluster.
+# - controller.replicaCount=1 — our 2x B2s nodes (2 vCPU / 4 GB) can't fit 2 NGINX replicas
+#   alongside AKS system pods + Gatekeeper + Defender. Going 2 replicas causes the 2nd pod
+#   to wedge (slow image pulls, probe timeouts). 1 replica is fine for a lab. See ADR 0011.
+# - externalTrafficPolicy=Local — Azure LB only routes to nodes that have a pod, instead of
+#   round-robining to all nodes (Cluster policy). On a small cluster where some nodes are
+#   metrics-unhealthy, Cluster policy causes ~50% blackhole rate. See ADR 0011.
 # - allowSnippetAnnotations=false (CVE-2025-1974 default in modern charts).
 helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
   --namespace "$NGINX_NAMESPACE" \
   --create-namespace \
   --version "$NGINX_CHART_VERSION" \
-  --set controller.replicaCount=2 \
+  --set controller.replicaCount=1 \
   --set controller.service.type=LoadBalancer \
+  --set controller.service.externalTrafficPolicy=Local \
   --set controller.allowSnippetAnnotations=false \
   --set controller.metrics.enabled=true \
   --wait \
-  --timeout 5m
+  --timeout 8m
 
 # ---------- 3. cert-manager ----------
 echo "[3/5] Installing cert-manager (with CRDs)..."
