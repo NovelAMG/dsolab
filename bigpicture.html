@@ -318,6 +318,97 @@ sequenceDiagram
 </tbody>
 </table>
 
+<h2>Dev workflow cheatsheet — the commands you'll see in every runbook</h2>
+
+<p>You will see the same 6–8 command shapes over and over. Once you can read these, runbooks stop being scary.</p>
+
+<h3>Git — the time machine + branching</h3>
+
+<table>
+<thead><tr><th>Command</th><th>What it does (plain English)</th></tr></thead>
+<tbody>
+<tr><td><code>git checkout main</code></td><td>"Move me to the <code>main</code> branch." Like switching to a different tab.</td></tr>
+<tr><td><code>git pull</code></td><td>"Download any commits other people pushed to this branch since I last looked."</td></tr>
+<tr><td><code>git checkout -b feat/04-cluster-prereqs</code></td><td>"Create a NEW branch called <code>feat/04-cluster-prereqs</code> off whatever branch I'm on, and switch to it." The <code>-b</code> means "branch, please make it."</td></tr>
+<tr><td><code>git add .</code></td><td>"Stage everything I changed in this folder (and below)." Staging = "include this in the next commit." The <code>.</code> means "current dir + everything under it."</td></tr>
+<tr><td><code>git commit -m "feat(1cd): adr 0001 + identity module"</code></td><td>"Save a snapshot of staged changes with this message." The <code>-m</code> is just shorthand for "give me a message inline so you don't open a text editor."</td></tr>
+<tr><td><code>git push -u origin feat/04-...</code></td><td>"Upload my branch to GitHub." <code>origin</code> = the GitHub copy. <code>-u</code> = "and remember this so next time I can just type <code>git push</code>."</td></tr>
+<tr><td><code>gh pr create --fill</code></td><td>"Open a pull request on GitHub using my commit message as the description."</td></tr>
+<tr><td><code>gh pr merge 4 --squash --delete-branch</code></td><td>"Merge PR #4 by squashing all my commits into one tidy commit, then delete the feature branch."</td></tr>
+</tbody>
+</table>
+
+<p><b>Why branches?</b> So broken WIP code never touches <code>main</code>. <code>main</code> is "what the robot will deploy." Branches are "your scratchpad."</p>
+
+<h3>Terraform — describe infra, then apply</h3>
+
+<table>
+<thead><tr><th>Command</th><th>What it does</th></tr></thead>
+<tbody>
+<tr><td><code>terraform init</code></td><td>Downloads providers (azurerm, azuread) and connects to the state file in Azure Storage. Run once per checkout.</td></tr>
+<tr><td><code>terraform plan</code></td><td>"Show me a diff: what would you change if I said yes?" READ-ONLY. Always run before apply.</td></tr>
+<tr><td><code>terraform apply</code></td><td>Actually makes the changes. Will re-run plan and ask you to type <code>yes</code>.</td></tr>
+<tr><td><code>terraform output</code></td><td>Print values the modules exposed (e.g., AKS OIDC issuer URL).</td></tr>
+</tbody>
+</table>
+
+<p>We rarely run these locally — GitHub Actions runs them for us when a PR is opened (plan) and when it merges (apply).</p>
+
+<h3>Azure CLI (<code>az</code>) — talk to Azure from your laptop</h3>
+
+<table>
+<thead><tr><th>Pattern</th><th>What it does</th></tr></thead>
+<tbody>
+<tr><td><code>az login</code></td><td>Opens a browser, asks you to sign in. After this, every <code>az</code> command runs as you.</td></tr>
+<tr><td><code>az account show</code></td><td>"Which subscription am I currently pointed at?"</td></tr>
+<tr><td><code>az aks get-credentials -g RG -n CLUSTER</code></td><td>Writes a <code>~/.kube/config</code> entry so <code>kubectl</code> can talk to this AKS cluster.</td></tr>
+<tr><td><code>az aks start / stop</code></td><td>Powers the cluster on/off. Stopping saves money but breaks anything that talks to it.</td></tr>
+<tr><td><code>az role assignment create --assignee X --role Y --scope Z</code></td><td>"Give identity X the role Y on resource Z." This is how RBAC works.</td></tr>
+<tr><td><code>... --query "..." -o tsv</code></td><td>The <code>--query</code> uses JMESPath (a JSON query language) to pick a field; <code>-o tsv</code> prints it raw (no quotes), perfect for assigning to a shell variable.</td></tr>
+</tbody>
+</table>
+
+<h3>Kubectl — talk to Kubernetes</h3>
+
+<table>
+<thead><tr><th>Command</th><th>What it does</th></tr></thead>
+<tbody>
+<tr><td><code>kubectl get nodes</code></td><td>List the VMs in the cluster. "Ready" = healthy.</td></tr>
+<tr><td><code>kubectl get pods -n n8n</code></td><td>List pods in the <code>n8n</code> namespace. <code>-n</code> = namespace (think: folder).</td></tr>
+<tr><td><code>kubectl apply -f file.yaml</code></td><td>"Make Kubernetes match what's in this YAML file." Creates or updates as needed.</td></tr>
+<tr><td><code>kubectl logs pod-name -n n8n</code></td><td>Print stdout/stderr from a container. Add <code>-f</code> to follow live.</td></tr>
+<tr><td><code>kubectl describe pod X -n n8n</code></td><td>Long-form info: events, conditions, image pull errors. First stop when something's broken.</td></tr>
+<tr><td><code>kubectl get svc -n ingress-nginx</code></td><td>List services. For LoadBalancer services, this is how you find your public IP.</td></tr>
+</tbody>
+</table>
+
+<h3>Helm — Kubernetes package manager</h3>
+
+<table>
+<thead><tr><th>Command</th><th>What it does</th></tr></thead>
+<tbody>
+<tr><td><code>helm repo add NAME URL</code></td><td>"Remember this chart repository under this short name."</td></tr>
+<tr><td><code>helm repo update</code></td><td>"Refresh the index of all known repos." Run before installing.</td></tr>
+<tr><td><code>helm install RELEASE_NAME REPO/CHART -n NAMESPACE</code></td><td>"Install this chart with this nickname into this namespace." A chart = a bundle of K8s YAML templates.</td></tr>
+<tr><td><code>helm upgrade --install ... </code></td><td>Install if missing, upgrade if exists. Idempotent — safe to re-run.</td></tr>
+<tr><td><code>helm list -A</code></td><td>"What did I install, across all namespaces?"</td></tr>
+</tbody>
+</table>
+
+<h3>Shell glue you'll keep seeing</h3>
+
+<table>
+<thead><tr><th>Pattern</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>VAR=$(some command)</code></td><td>Run the command, capture its stdout into <code>VAR</code>.</td></tr>
+<tr><td><code>"$VAR"</code></td><td>Use VAR's value. The quotes prevent spaces from breaking things.</td></tr>
+<tr><td><code>cmd1 && cmd2</code></td><td>Run <code>cmd2</code> only if <code>cmd1</code> succeeded. Chains things safely.</td></tr>
+<tr><td><code>cmd | tail -5</code></td><td>Run cmd, but only show the last 5 lines. <code>|</code> = "pipe output into next command."</td></tr>
+<tr><td><code>cmd 2>&1</code></td><td>Combine error output into normal output (so grep can see it).</td></tr>
+<tr><td><code>cd /path/to/dir &amp;&amp; ...</code></td><td>Switch to that directory first, then run the rest. Doesn't permanently change your shell.</td></tr>
+</tbody>
+</table>
+
 <h2>Glossary — every word you've seen, in 1 line</h2>
 
 <table>
