@@ -1,0 +1,23 @@
+# PersistentVolumeClaim — n8n stores binary data (workflow files, user uploads,
+# the encryption key file used internally) on disk. We use Azure Files (RWX) so
+# the volume can survive pod restarts and (later) be mounted by replicas.
+#
+# Why Azure Files vs. Azure Disk:
+#   - Disk = RWO (one node at a time). Faster, but blocks pod re-scheduling
+#     while the disk is detached/attached → restarts feel slow on a small cluster.
+#   - Files = RWX (multi-attach). Slower I/O, but pods can move between nodes
+#     instantly. For n8n's small footprint, Files wins on operability.
+#
+# `azurefile-csi` is the default StorageClass that AKS ships pre-installed.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: n8n-data
+  namespace: n8n
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: azurefile-csi
+  resources:
+    requests:
+      storage: 5Gi
