@@ -101,6 +101,16 @@ spec:
           ports:
             - name: http
               containerPort: 4180
+          # Container-level hardening: oauth2-proxy is a static Go binary that
+          # writes nothing to disk. readOnlyRootFilesystem here is essentially
+          # free hardening — any attacker dropping into the pod cannot stage
+          # new binaries or modify the auth proxy. See ADR-0019.
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+            # seccompProfile is inherited from pod-level spec.securityContext
           readinessProbe:
             httpGet:
               path: /ready

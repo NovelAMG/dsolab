@@ -112,9 +112,26 @@ spec:
             limits:
               cpu: "500m"
               memory: "768Mi"
+          # Container-level hardening: blocks the classic "download + chmod +
+          # execute new binary" drift attack. Defender ContainerSensor will
+          # still detect drift attempts (alerts) but readOnlyRootFilesystem
+          # *prevents* them by making the FS un-writable. Phase 3 / ADR-0019.
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+            # seccompProfile is inherited from pod-level spec.securityContext
           volumeMounts:
             - name: data
               mountPath: /home/node/.n8n
+            # n8n writes temp files to /tmp during workflow execution
+            # (vm2 sandbox compiles, code node $tmp, etc.)
+            - name: tmp
+              mountPath: /tmp
+            # npm cache for Code nodes that require() community modules
+            - name: node-cache
+              mountPath: /home/node/.cache
           # n8n is slow to boot on Burstable VMs (~30-45s). Generous probes.
           startupProbe:
             httpGet:
@@ -140,3 +157,9 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: n8n-data
+        - name: tmp
+          emptyDir:
+            sizeLimit: 256Mi
+        - name: node-cache
+          emptyDir:
+            sizeLimit: 128Mi
