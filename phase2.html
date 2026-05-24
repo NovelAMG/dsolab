@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phase 2 — Build-time Security, for Security People</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+  const theme = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'default' : 'dark';
+  mermaid.initialize({ startOnLoad: true, theme: theme, securityLevel: 'loose' });
+</script>
+<style>
+:root {
+  --bg: #0f1419;
+  --panel: #161b22;
+  --panel-2: #1f2733;
+  --text: #e6edf3;
+  --muted: #8b949e;
+  --accent: #58a6ff;
+  --accent-2: #7ee787;
+  --warn: #f0883e;
+  --danger: #ff7b72;
+  --border: #30363d;
+  --code-bg: #0d1117;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #ffffff; --panel: #f6f8fa; --panel-2: #eaeef2; --text: #1f2328;
+    --muted: #656d76; --accent: #0969da; --accent-2: #1a7f37; --warn: #bc4c00;
+    --danger: #cf222e; --border: #d0d7de; --code-bg: #f6f8fa;
+  }
+}
+* { box-sizing: border-box; }
+html, body { background: var(--bg); color: var(--text); margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  font-size: 15px; line-height: 1.65;
+  max-width: 1100px; margin: 0 auto; padding: 32px 24px 64px;
+}
+h1 { font-size: 30px; margin: 0 0 8px; }
+h2 { font-size: 22px; margin: 40px 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); color: var(--accent); }
+h3 { font-size: 17px; margin: 24px 0 8px; color: var(--accent-2); }
+h4 { font-size: 15px; margin: 16px 0 6px; color: var(--text); }
+p { margin: 10px 0; }
+.subtitle { color: var(--muted); margin-bottom: 24px; font-size: 16px; }
+.kicker { font-size: 14px; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+code { background: var(--code-bg); padding: 2px 6px; border-radius: 4px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 13px; color: var(--accent-2); }
+pre { background: var(--code-bg); padding: 14px; border-radius: 6px; overflow-x: auto; border: 1px solid var(--border); font-size: 13px; line-height: 1.5; }
+pre code { background: none; padding: 0; color: var(--text); }
+table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 14px; }
+th, td { border: 1px solid var(--border); padding: 10px 14px; text-align: left; vertical-align: top; }
+th { background: var(--panel-2); font-weight: 600; }
+tr:nth-child(even) td { background: var(--panel); }
+ul, ol { padding-left: 24px; }
+li { margin: 6px 0; }
+.callout { background: var(--panel); border-left: 4px solid var(--accent); padding: 14px 18px; border-radius: 4px; margin: 20px 0; }
+.callout.tip { border-color: var(--accent-2); }
+.callout.warn { border-color: var(--warn); }
+.callout.danger { border-color: var(--danger); }
+.mermaid {
+  background: var(--panel);
+  padding: 20px;
+  border-radius: 8px;
+  margin: 20px 0;
+  text-align: center;
+  border: 1px solid var(--border);
+  overflow-x: auto;
+}
+.mermaid svg { max-width: 100%; height: auto; }
+hr { border: none; border-top: 1px solid var(--border); margin: 36px 0; }
+.tag-set { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.tag { background: var(--panel-2); padding: 3px 10px; border-radius: 3px; font-size: 12px; color: var(--muted); }
+.q { font-style: italic; color: var(--muted); margin: 6px 0; }
+.wf-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 18px 22px;
+  margin: 18px 0;
+}
+.wf-card h3 { margin-top: 0; }
+.wf-meta {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: 6px 12px;
+  font-size: 13px;
+  margin: 12px 0;
+}
+.wf-meta .label { color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; font-size: 11px; padding-top: 3px; }
+.scenario {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 16px 20px;
+  margin: 16px 0;
+}
+.scenario h4 { color: var(--accent); margin-top: 0; }
+.lane {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 8px 16px;
+  margin: 10px 0;
+  font-size: 14px;
+}
+.lane .who { color: var(--muted); font-weight: 600; text-align: right; padding-top: 2px; }
+.toc {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 18px 24px;
+  margin: 20px 0 30px;
+}
+.toc ol { margin: 8px 0; }
+.toc a { color: var(--accent); text-decoration: none; }
+.toc a:hover { text-decoration: underline; }
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 10px 0 20px;
+  font-size: 13px;
+}
+.legend span { padding: 4px 10px; border-radius: 4px; }
+.legend .gate-block { background: rgba(255,123,114,0.15); color: var(--danger); border: 1px solid var(--danger); }
+.legend .gate-info { background: rgba(88,166,255,0.15); color: var(--accent); border: 1px solid var(--accent); }
+.legend .gate-na { background: rgba(139,148,158,0.15); color: var(--muted); border: 1px solid var(--muted); }
+@media print {
+  body { max-width: none; padding: 0; color: #000; background: #fff; }
+  h2 { page-break-before: always; }
+  .mermaid { page-break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+
+<div class="kicker">DevSecOps Lab — Phase 2</div>
+<h1>Build-time Security, for Security People</h1>
+<p class="subtitle">
+What every <code>.github/workflows/*.yml</code> file does, why it exists, how it relates to Pull Requests,
+and what concretely happens when you change one line of Terraform or one line of TypeScript.
+</p>
+
+<div class="toc">
+<strong>What's in here</strong>
+<ol>
+  <li><a href="#tldr">TL;DR — Phase 2 in one paragraph</a></li>
+  <li><a href="#mental-model">The mental model: build-time vs runtime</a></li>
+  <li><a href="#cicd">What CI/CD actually is (no jargon)</a></li>
+  <li><a href="#pattern">The "when X happens, run Y" pattern</a></li>
+  <li><a href="#anatomy">Anatomy of one workflow file</a></li>
+  <li><a href="#workflows">All 7 of our workflows, one by one</a></li>
+  <li><a href="#pr-flow">How this connects to Pull Requests</a></li>
+  <li><a href="#scenarios">Concrete scenarios: "I change X, what happens?"</a></li>
+  <li><a href="#sec-view">What you, the security person, actually look at</a></li>
+  <li><a href="#cheatsheet">One-page cheatsheet</a></li>
+</ol>
+</div>
+
+<hr>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2 id="tldr">1. TL;DR</h2>
+
+<div class="callout tip">
+<strong>Build-time security =</strong> automated scanners that read code/config/images <em>before</em> they ever deploy.
+We added five of them. They run on GitHub's servers every time someone proposes a change.
+If they find something serious, the change cannot be merged. Findings appear in one dashboard
+at <code>github.com/&lt;repo&gt;/security</code>.
+<br><br>
+<strong>You don't run them manually.</strong> They run themselves when triggered by a code change.
+</div>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2 id="mental-model">2. The mental model: build-time vs runtime</h2>
+
+<p>
+Security splits into two halves. Phase 2 is the left half. Phase 3 will add the right half.
+</p>
+
+<div class="mermaid">
+flowchart LR
+  subgraph BUILD ["BUILD-TIME (Phase 2 — what we did)"]
+    direction TB
+    B1["Source code<br/>(SPA TypeScript)"]
+    B2["Dependencies<br/>(package.json)"]
+    B3["Container image<br/>(SPA Dockerfile)"]
+    B4["Infrastructure code<br/>(Terraform, K8s YAML)"]
+    B5["Secrets in commits"]
+  end
+  subgraph RUN ["RUNTIME (Phase 3 — later)"]
+    direction TB
+    R1["Running containers<br/>(what's actually executing)"]
+    R2["Network traffic<br/>(who talks to who)"]
+    R3["Identity usage<br/>(who is using which credential)"]
+    R4["Cloud configuration drift<br/>(someone changed it via portal)"]
+  end
+  BUILD ==> RUN
+  classDef build fill:#1a3a5c,stroke:#58a6ff,color:#e6edf3
+  classDef run fill:#3a2a1a,stroke:#f0883e,color:#e6edf3
+  class B1,B2,B3,B4,B5 build
+  class R1,R2,R3,R4 run
+</div>
+
+<p>
+<strong>Build-time scanners look at the artifact before it ships.</strong>
+"This Terraform file would create a public storage bucket — don't merge it."
+They cannot tell you what's <em>actually</em> running in your cluster right now.
+That's Phase 3's job.
+</p>
+
+<p>
+The key insight: <strong>most production breaches start with something that could have been caught at build time</strong>
+— hardcoded creds, outdated library with a CVE, misconfigured S3 bucket, weak Dockerfile.
+Fixing it before merge is cheap. Fixing it after deploy means an incident.
+</p>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2 id="cicd">3. What CI/CD actually is (no jargon)</h2>
+
+<p>
+<strong>CI = Continuous Integration.</strong> Every time someone commits code, automated checks run.
+<br>
+<strong>CD = Continuous Deployment.</strong> If checks pass, the change gets deployed automatically.
+</p>
+
+<p>
+GitHub's implementation is called <strong>GitHub Actions</strong>. The pieces:
+</p>
+
+<table>
+<tr><th>Word</th><th>What it actually means</th></tr>
+<tr><td><strong>Workflow</strong></td><td>A YAML file in <code>.github/workflows/</code>. Like a shell script with a schedule.</td></tr>
+<tr><td><strong>Trigger</strong> (<code>on:</code>)</td><td>The event that starts it. Examples: someone pushed to <code>main</code>, someone opened a PR, a cron schedule fired.</td></tr>
+<tr><td><strong>Job</strong></td><td>A group of steps that run together on one fresh virtual machine (a "runner").</td></tr>
+<tr><td><strong>Step</strong></td><td>One command or one prebuilt action. E.g. "checkout the code", "run Trivy".</td></tr>
+<tr><td><strong>Action</strong></td><td>A reusable pre-packaged step published by someone (Microsoft, Aqua, etc.). You reference it by name + version like <code>aquasecurity/trivy-action@v0.36.0</code>.</td></tr>
+<tr><td><strong>Runner</strong></td><td>The throwaway Ubuntu/Windows/macOS VM where your workflow runs. Lives for the duration of one job, then dies.</td></tr>
+<tr><td><strong>SARIF</strong></td><td>A standard JSON format for "here are the security findings I found". CodeQL, Trivy, Checkov all emit SARIF; GitHub's Security tab consumes it.</td></tr>
+</table>
+
+<div class="callout">
+<strong>Analogy:</strong> A workflow file is a recipe. The trigger is when to cook
+("on Sunday mornings", "when someone rings the doorbell"). The runner is the kitchen.
+The job is the dish. The steps are the instructions.
+</div>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2 id="pattern">4. The "when X happens, run Y" pattern</h2>
+
+<p>
+Every workflow is shaped like this:
+</p>
+
+<pre><code>name: Trivy (image scan)        # Display name in GitHub UI
+
+on:                              # ← TRIGGER (the X)
+  pull_request:
+    branches: [main]
+    paths:
+      - 'spa/**'                 #   only when SPA files change in a PR
+
+permissions:                     # What this workflow is allowed to touch
+  contents: read
+  security-events: write         # upload findings to Security tab
+
+jobs:                            # ← THE Y (what to do)
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4              # get the code
+      - uses: docker/build-push-action@v6      # build the image
+      - uses: aquasecurity/trivy-action@v0.36  # scan it
+        with:
+          exit-code: '1'         # ← fail the job if it finds anything HIGH/CRITICAL</code></pre>
+
+<p>
+That's the whole pattern. Every one of our workflows follows it.
+Different trigger, different steps, same shape.
+</p>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2 id="anatomy">5. Anatomy of one workflow file</h2>
+
+<div class="mermaid">
+flowchart TB
+  Trigger["<b>on:</b><br/>WHEN to run<br/>(push / pull_request / schedule)"]
+  Trigger --> Perms["<b>permissions:</b><br/>WHAT it can touch<br/>(read code? write security alerts?)"]
+  Perms --> Jobs["<b>jobs:</b><br/>WHAT to do"]
+  Jobs --> Runner["Spin up fresh<br/>Ubuntu VM (runner)"]
+  Runner --> S1["Step 1: checkout code"]
+  S1 --> S2["Step 2: install tool"]
+  S2 --> S3["Step 3: run scanner"]
+  S3 --> S4["Step 4: upload findings (SARIF)"]
+  S4 --> Result{"Exit code"}
+  Result -->|0| Pass["GREEN check<br/>on the PR"]
+  Result -->|1| Fail["RED check<br/>blocks the PR"]
+  classDef good fill:#1a3a2a,stroke:#7ee787
+  classDef bad fill:#3a1a1a,stroke:#ff7b72
+  class Pass good
+  class Fail bad
+</div>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2 id="workflows">6. All 7 of our workflows, one by one</h2>
+
+<p>
+These are exactly what appears in your screenshot of <code>github.com/.../actions</code>.
+</p>
+
+<div class="legend">
+  <span class="gate-block">BLOCKING — failure stops merge</span>
+  <span class="gate-info">INFORMATIONAL — failure surfaces but does not stop merge</span>
+  <span class="gate-na">DEPLOY — not a check, it makes changes</span>
+</div>
+
+<!-- 1 -->
+<div class="wf-card">
+<h3>1. Hello World (OIDC smoke test) <span class="tag-set" style="display:inline-flex">
+  <span class="tag" style="color:var(--muted)">utility, not security</span>
+</span></h3>
+<div class="wf-meta">
+  <span class="label">File</span><span><code>.github/workflows/hello-world.yml</code></span>
+  <span class="label">Trigger</span><span>Manual click ("Run workflow") or when the file itself changes</span>
+  <span class="label">What it does</span><span>Logs into Azure using OIDC (no passwords), prints subscription info, exits</span>
+  <span class="label">Why exists</span><span>Proves the GitHub ↔ Azure trust relationship works. If this fails, nothing else that touches Azure will work either.</span>
+  <span class="label">Relates to PR</span><span>No — it's a manual diagnostic tool</span>
+</div>
+</div>
+
+<!-- 2 -->
+<div class="wf-card">
+<h3>2. Terraform Plan (PR) <span class="tag-set" style="display:inline-flex">
+  <span class="tag" style="color:var(--accent)">infrastructure preview</span>
+</span></h3>
+<div class="wf-meta">
+  <span class="label">File</span><span><code>.github/workflows/tf-plan.yml</code></span>
+  <span class="label">Trigger</span><span>Any PR that touches <code>terraform/**</code></span>
+  <span class="label">What it does</span><span>Runs <code>terraform plan</code> — a dry-run that says "if you merged this, here's what would change in Azure". Posts the diff as a comment on the PR.</span>
+  <span class="label">Why exists</span><span>So reviewers can see "this PR would delete a Key Vault" before approving. No surprises post-merge.</span>
+  <span class="label">Relates to PR</span><span>Yes — its output appears as a comment on every infrastructure PR</span>
+</div>
+</div>
+
+<!-- 3 -->
+<div class="wf-card">
+<h3>3. Terraform Apply (main) <span class="tag-set" style="display:inline-flex">
+  <span class="tag" style="color:var(--warn)">DEPLOYS to Azure</span>
+</span></h3>
+<div class="wf-meta">
+  <span class="label">File</span><span><code>.github/workflows/tf-apply.yml</code></span>
+  <span class="label">Trigger</span><span>Push to <code>main</code> that touches <code>terraform/**</code> (i.e. immediately after a TF PR merges)</span>
+  <span class="label">What it does</span><span>Runs <code>terraform apply</code> — actually makes the changes in Azure that the PR described.</span>
+  <span class="label">Why exists</span><span>This is GitOps. The git history IS the deployment record. To change Azure, you open a PR; merging it deploys it.</span>
+  <span class="label">Relates to PR</span><span>Runs <em>after</em> the PR is merged. Not a gate. It's the deploy step.</span>
+</div>
+</div>
+
+<!-- 4 -->
+<div class="wf-card">
+<h3>4. CodeQL (SAST) <span class="tag-set" style="display:inline-flex">
+  <span class="tag" style="color:var(--accent)">source code scanner</span>
+</span></h3>
+<div class="wf-meta">
+  <span class="label">File</span><span><code>.github/workflows/codeql.yml</code></span>
+  <span class="label">Trigger</span><span>PR or push to <code>main</code> touching <code>spa/**</code>, plus weekly cron</span>
+  <span class="label">What it does</span><span>Reads the SPA TypeScript looking for security bug patterns: hardcoded secrets, XSS sinks, weak crypto, prototype pollution, etc. Uploads findings as SARIF.</span>
+  <span class="label">Why exists</span><span>Catches "the developer wrote insecure code" — not a CVE in a library, but a mistake in our own source. Free for public repos via GitHub.</span>
+  <span class="label">Relates to PR</span><span>Yes — appears as a check; findings appear in the Security tab and inline on the PR diff</span>
+</div>
+</div>
+
+<!-- 5 -->
+<div class="wf-card">
+<h3>5. Trivy (image scan) <span class="tag-set" style="display:inline-flex">
+  <span class="tag" style="color:var(--danger)">BLOCKING on HIGH/CRITICAL</span>
+</span></h3>
+<div class="wf-meta">
+  <span class="label">File</span><span><code>.github/workflows/trivy-image.yml</code></span>
+  <span class="label">Trigger</span><span>PR or push to <code>main</code> touching <code>spa/**</code>, plus weekly cron</span>
+  <span class="label">What it does</span><span>Builds the SPA container image (exactly as it would be deployed), then scans every OS package and npm dependency inside it against CVE databases. Fails the build if any fixable HIGH/CRITICAL exists.</span>
+  <span class="label">Why exists</span><span>The image is what actually runs in production. If <code>nginx:alpine</code> ships with a Log4j-style CVE, we know before deploy, not after.</span>
+  <span class="label">Relates to PR</span><span>Yes — and it BLOCKS the merge if a critical CVE is found</span>
+</div>
+</div>
+
+<!-- 6 -->
+<div class="wf-card">
+<h3>6. Checkov (IaC) <span class="tag-set" style="display:inline-flex">
+  <span class="tag" style="color:var(--accent)">misconfiguration scanner</span>
+</span></h3>
+<div class="wf-meta">
+  <span class="label">File</span><span><code>.github/workflows/checkov.yml</code></span>
+  <span class="label">Trigger</span><span>PR or push to <code>main</code> touching <code>terraform/**</code>, <code>k8s/**</code>, or <code>spa/Dockerfile</code></span>
+  <span class="label">What it does</span><span>Parses your Terraform, K8s YAML, and Dockerfile. Runs ~1000 rules looking for misconfigurations: public storage, weak TLS, no encryption, root containers, no resource limits, etc. Uploads SARIF to Security tab.</span>
+  <span class="label">Why exists</span><span>Catches "the engineer wrote infrastructure that's insecure". E.g. a TF file that creates an Azure Storage account with public-blob access — Checkov flags it before it deploys.</span>
+  <span class="label">Relates to PR</span><span>Yes — INFORMATIONAL right now (~95 inherited findings being triaged in issue #17). Will be BLOCKING once the baseline is clean.</span>
+</div>
+</div>
+
+<!-- 7 -->
+<div class="wf-card">
+<h3>7. Dependabot Updates <span class="tag-set" style="display:inline-flex">
+  <span class="tag" style="color:var(--accent-2)">opens PRs for you</span>
+</span></h3>
+<div class="wf-meta">
+  <span class="label">File</span><span><code>.github/dependabot.yml</code> (not a workflow file — config for a GitHub-built-in bot)</span>
+  <span class="label">Trigger</span><span>Weekly schedule + instantly when a new CVE matching your deps drops</span>
+  <span class="label">What it does</span><span>Reads <code>package.json</code>, GitHub Actions versions, Terraform providers, Docker base images. Opens PRs that bump them.</span>
+  <span class="label">Why exists</span><span>Software rots. Yesterday's safe library has today's CVE. Dependabot does the version-bumping work for you and makes the bump a normal PR that runs all your checks.</span>
+  <span class="label">Relates to PR</span><span>Dependabot IS a PR opener. The PRs it opens then go through CodeQL/Trivy/Checkov like any other PR.</span>
+</div>
+</div>
+
+<div class="callout tip">
+<strong>The pattern:</strong> 2 of these (Plan, Apply) are for deploying infrastructure.
+4 of these (CodeQL, Trivy, Checkov, Dependabot) are for security.
+1 (Hello World) is a diagnostic. Each one has a single job: trigger + steps + result.
+</div>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2 id="pr-flow">7. How this connects to Pull Requests</h2>
+
+<p>
+A Pull Request (PR) is "I propose this change to the codebase, please review and merge".
+Every workflow with <code>on: pull_request</code> appears as a <strong>check</strong> on the PR.
+GitHub shows them at the bottom of the PR page as a list of green/red boxes.
+</p>
+
+<div class="mermaid">
+sequenceDiagram
+  participant Dev as Engineer
+  participant Git as GitHub (repo)
+  participant CI as GitHub Actions (runners)
+  participant Sec as Security tab
+
+  Dev->>Git: git push (new branch)
+  Dev->>Git: open Pull Request
+
+  Note over Git,CI: GitHub sees the PR, checks each workflow's "on:" trigger
+  Git->>CI: PR touches spa/** → run CodeQL + Trivy
+  Git->>CI: PR touches terraform/** → run TF Plan + Checkov
+
+  CI-->>Git: post results as "checks" on the PR
+  CI-->>Sec: upload findings as SARIF
+
+  alt Any blocking check failed
+    Git-->>Dev: Merge button DISABLED
+    Dev->>Git: push fix (or accept finding)
+    Note over Git,CI: checks re-run automatically
+  else All checks green
+    Git-->>Dev: Merge button enabled
+    Dev->>Git: click Squash & merge
+    Git->>CI: now run main-only workflows<br/>(TF Apply deploys to Azure)
+  end
+</div>
+
+<p>
+<strong>The contract:</strong> blocking checks must be green before merge.
+Informational checks just show up; reviewer decides.
+You never have to run anything by hand — GitHub orchestrates it all when the PR is opened.
+</p>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2 id="scenarios">8. Concrete scenarios: "I change X, what happens?"</h2>
+
+<!-- Scenario 1 -->
+<div class="scenario">
+<h4>Scenario A — You add an Azure Storage Account to Terraform</h4>
+<p><em>You open the file <code>terraform/envs/lab/main.tf</code> and append a public-blob storage account:</em></p>
+
+<pre><code>resource "azurerm_storage_account" "demo" {
+  name                     = "stdemo123"
+  resource_group_name      = azurerm_resource_group.lab.name
+  location                 = "southeastasia"
+  account_tier             = "Standard"
+  account_replication_type = "LRS"
+  allow_nested_items_to_be_public = true   # ← Checkov will flag this
+}</code></pre>
+
+<p>You commit, push, open a PR. <strong>This is what happens automatically</strong> within ~2 minutes:</p>
+
+<div class="lane"><span class="who">GitHub</span><span>Sees the PR. Looks at each <code>on:</code> trigger. Notices <code>terraform/**</code> changed.</span></div>
+<div class="lane"><span class="who">tf-plan.yml</span><span>Runs <code>terraform plan</code>. Posts a comment on your PR: "+ 1 resource (azurerm_storage_account.demo)". So reviewers can see the diff in human terms.</span></div>
+<div class="lane"><span class="who">checkov.yml</span><span>Parses the same file. Hits rule <code>CKV_AZURE_59</code> ("Ensure that Storage Accounts disallow public access"). Uploads SARIF. Today: shows up in Security tab (informational). Soon: blocks the PR.</span></div>
+<div class="lane"><span class="who">codeql.yml</span><span>Doesn't run — you didn't touch <code>spa/**</code>.</span></div>
+<div class="lane"><span class="who">trivy-image.yml</span><span>Doesn't run — same reason.</span></div>
+<div class="lane"><span class="who">You</span><span>See a red Checkov finding on the PR. Either fix it (<code>allow_nested_items_to_be_public = false</code>) or — if there's a good reason — add an allow-list entry to <code>.checkov.yaml</code> with a written reason.</span></div>
+<div class="lane"><span class="who">After merge</span><span>tf-apply.yml runs automatically. <code>terraform apply</code> creates the storage account in Azure.</span></div>
+
+<div class="callout warn">
+<strong>Before Phase 2:</strong> that storage account would have been created in Azure, sat there publicly, and waited to be exploited or noticed weeks later.
+<br>
+<strong>After Phase 2:</strong> the engineer sees the finding in the PR within 2 minutes, fixes it, and the public bucket never exists.
+</div>
+</div>
+
+<!-- Scenario 2 -->
+<div class="scenario">
+<h4>Scenario B — You upgrade the SPA's React version</h4>
+<p><em>You edit <code>spa/package.json</code> from <code>"react": "^18.3.1"</code> to <code>"react": "^19.0.0"</code> and push.</em></p>
+
+<div class="lane"><span class="who">codeql.yml</span><span>Runs (SPA changed). Re-analyses TS — catches anything that became newly invalid under React 19's typings.</span></div>
+<div class="lane"><span class="who">trivy-image.yml</span><span>Runs. Builds a fresh image with new deps. Scans. Reports any CVEs in the new dep tree.</span></div>
+<div class="lane"><span class="who">checkov.yml</span><span>Doesn't run — no IaC changed.</span></div>
+<div class="lane"><span class="who">tf-plan.yml</span><span>Doesn't run.</span></div>
+<div class="lane"><span class="who">You</span><span>See 2 green checks. If a CVE shows up, react@19.0.1 might already have it fixed — bump again, push, checks re-run.</span></div>
+</div>
+
+<!-- Scenario 3 -->
+<div class="scenario">
+<h4>Scenario C — Dependabot opens a PR for you (no human action)</h4>
+<p><em>It's Monday morning. A new CVE in <code>vite</code> drops. Dependabot sees you depend on a vulnerable version.</em></p>
+
+<div class="lane"><span class="who">Dependabot</span><span>Opens PR #N: "Bump vite from 5.4.10 to 5.4.12". Title prefixed <code>chore(spa-deps):</code>.</span></div>
+<div class="lane"><span class="who">codeql.yml</span><span>Runs (PR touches <code>spa/**</code>).</span></div>
+<div class="lane"><span class="who">trivy-image.yml</span><span>Runs. The new vite version is clean — Trivy passes. (Before the bump it would have failed.)</span></div>
+<div class="lane"><span class="who">You</span><span>Look at the PR. All checks green. Click Merge. Done.</span></div>
+
+<div class="callout tip">
+This loop is what "shift-left" means in practice. The CVE was disclosed at 09:00. Dependabot opened a PR at 09:05. Checks ran by 09:08. You merged at 09:10. Total exposure window: minutes, not weeks.
+</div>
+</div>
+
+<!-- Scenario 4 -->
+<div class="scenario">
+<h4>Scenario D — You try to commit an API key by accident</h4>
+<p><em>You're testing locally, paste a real Azure key into a file, run <code>git push</code>.</em></p>
+
+<div class="lane"><span class="who">GitHub (push protection)</span><span>The push is REJECTED at the server before the commit lands. You see:<br><code>remote: error: GH013: Repository rule violations found for refs/heads/...<br>remote: - Push cannot contain secrets.</code></span></div>
+<div class="lane"><span class="who">You</span><span>Remove the key, push again. Or, if it's a false positive, click the link GitHub gave you to mark it as allowed.</span></div>
+
+<p>This isn't a workflow at all — it's GitHub's secret-scanning + push-protection feature.
+It's already on for your repo. No code, no YAML, you just benefit from it.</p>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2 id="sec-view">9. What you, the security person, actually look at</h2>
+
+<p>
+Forget the YAML. As a security engineer your workflow is:
+</p>
+
+<div class="mermaid">
+flowchart LR
+  start(["Open repo"]) --> sec["Click 'Security' tab"]
+  sec --> overview["Overview shows<br/>counts per category"]
+  overview --> ds["Dependabot alerts"]
+  overview --> cs["Code scanning"]
+  overview --> ss["Secret scanning"]
+  ds --> triage["Triage each finding:<br/>Fix / Dismiss with reason"]
+  cs --> triage
+  ss --> triage
+  triage --> close{"Resolved?"}
+  close -->|fixed| green["Alert auto-closes"]
+  close -->|dismissed| recorded["Reason recorded in audit log"]
+  classDef ok fill:#1a3a2a,stroke:#7ee787
+  class green ok
+</div>
+
+<table>
+<tr><th>URL</th><th>What's there</th><th>What you do</th></tr>
+<tr><td><code>/security</code></td><td>Top-level dashboard. Counts only.</td><td>Glance at it daily. Numbers going down = good.</td></tr>
+<tr><td><code>/security/dependabot</code></td><td>Vulnerable dependencies. Severity, CVE ID, fix version.</td><td>Click an alert → review → merge the auto-PR (or dismiss with reason).</td></tr>
+<tr><td><code>/security/code-scanning</code></td><td>All SARIF findings from CodeQL + Trivy + Checkov, filterable by tool, severity, file.</td><td>Filter by <code>Tool: trivy-image</code> or <code>Tool: checkov</code>. Each finding has location, rule ID, and a "Dismiss" workflow.</td></tr>
+<tr><td><code>/security/secret-scanning</code></td><td>Hardcoded secrets caught in history.</td><td>Rotate the leaked secret in Azure/wherever, then close the alert.</td></tr>
+<tr><td><code>/actions</code></td><td>Live workflow runs. Green/red boxes per run.</td><td>Only visit when investigating "why did this PR not merge?"</td></tr>
+<tr><td><code>/pulls</code></td><td>Open PRs including the ones Dependabot opened.</td><td>Review the auto-PRs, click Merge when green.</td></tr>
+</table>
+
+<div class="callout">
+<strong>Daily 5-minute habit:</strong> open <code>/security</code>. Sort by severity. Address anything new HIGH/CRITICAL. Done.
+</div>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2 id="cheatsheet">10. One-page cheatsheet</h2>
+
+<table>
+<tr><th>Question</th><th>Answer</th></tr>
+<tr><td>Where do workflows live?</td><td><code>.github/workflows/*.yml</code> — one YAML file per workflow.</td></tr>
+<tr><td>Where does Dependabot config live?</td><td><code>.github/dependabot.yml</code> — single file, lists which ecosystems to watch.</td></tr>
+<tr><td>How do they get triggered?</td><td>The <code>on:</code> block at the top: <code>push</code>, <code>pull_request</code>, <code>schedule</code> (cron), or <code>workflow_dispatch</code> (manual).</td></tr>
+<tr><td>Where do they run?</td><td>On a fresh Ubuntu VM ("runner") that GitHub provides. Free for public repos.</td></tr>
+<tr><td>How do findings reach the dashboard?</td><td>Each scanner outputs SARIF (a standard JSON). The <code>upload-sarif</code> action pushes it to GitHub. Security tab consumes it.</td></tr>
+<tr><td>Who decides what blocks a PR?</td><td>The workflow itself, via exit codes. <code>exit-code: '1'</code> = fails the check = blocks the PR (if branch protection is on).</td></tr>
+<tr><td>Why are some scans "informational"?</td><td>Because the baseline has known findings we haven't fixed yet. Blocking from day 1 would freeze the repo. Flip to blocking once baseline is clean.</td></tr>
+<tr><td>Is this GitHub Advanced Security?</td><td>Yes — and on a public repo it's free. On a private repo, GHAS is a paid line item.</td></tr>
+<tr><td>Do I have to write YAML?</td><td>You don't. Your engineers do (once, then it runs forever). You read the Security tab.</td></tr>
+<tr><td>What if a finding is a false positive?</td><td>Dismiss it in the UI with a reason ("False positive — N/A in lab"), OR add to <code>.checkov.yaml</code> skip-list with a comment. Either way, the rationale is preserved.</td></tr>
+</table>
+
+<hr>
+
+<div class="callout tip">
+<strong>Bottom line for a security engineer:</strong>
+The YAML is the engineer's responsibility — they write it once. Your job is to (a) make sure
+all five scanners exist and run, (b) check the Security tab regularly, (c) triage findings
+into "fix" or "accept-with-reason", and (d) flip informational scanners to blocking once
+the baseline is green. That's Phase 2 done.
+</div>
+
+<p class="subtitle" style="margin-top: 30px; text-align: center;">
+Generated for the DevSecOps lab — Phase 2 close-out.
+Next: <strong>Phase 3</strong> — the runtime half (Defender for Cloud + cilium + TLS-prod).
+</p>
+
+</body>
+</html>
