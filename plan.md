@@ -256,8 +256,8 @@ Goal: defense-in-depth at the cluster layer. Even a malicious image that slips p
 > | 3.3 | Runtime sensor on AKS | ✅ done (AKS add-on) | 8 Defender pods running in `kube-system`. ADR 0001 deferral ended. |
 > | 3.4 | NetworkPolicy default-deny in `n8n` ns | ⏸️ deferred | Will revisit; low priority for solo lab without lateral-movement risk yet |
 > | 3.5 | Key Vault CSI — secrets out of K8s | ⏸️ deferred | Same |
-> | **3.6** | **Cosign signing in CI** (build-time attestation) | ⏳ NEXT | Pre-req for 3.7 |
-> | **3.7** | **Defender Image Integrity** (gated deployment on signature + CVE) | ⏳ NEXT | Via portal toggle + Azure Policy; consumes 3.6 signatures. ADR 0016 |
+> | **3.6** | **Cosign signing in CI** (build-time attestation) | ✅ done 2026-05-24 | PR #32. First signed image: `dsolab/spa:be79d39` + signature artifact `sha256-006f....sig` in ACR. Identity: `repo:tonzking123/dsolab:ref:refs/heads/main` via GitHub OIDC keyless. ADR 0017 documents the build-in-CI-not-laptop decision. |
+> | **3.7** | **Defender Image Integrity** (gated deployment on signature + CVE) | ⏳ NEXT | Now has signatures to verify. ADR 0016 |
 > | 3.8 | Switch Defender sensor add-on → Helm | 🔜 later | Required to unlock Antimalware + Binary drift **blocking** (preview); plan before Phase 5 detonation |
 > | 3.9 | Ingress hardening (AFD/WAF, AOAI private endpoint) | 🔜 later | Was 3.3 in original numbering; renumbered to avoid confusion |
 > | 3.10 | Logging + drift detection (already partially on via 3.3) | 🔜 later | Was 3.4 in original numbering |
@@ -287,12 +287,18 @@ Goal: defense-in-depth at the cluster layer. Even a malicious image that slips p
 - Plan: enable Azure Key Vault Secrets Provider AKS add-on, write `SecretProviderClass`, move Postgres password + n8n encryption key + oauth2-proxy secrets out of K8s Secrets into KV.
 - Deferred for same reason as 3.4.
 
-### 3.6 Cosign signing in CI — ⏳ NEXT (build-time provenance)
-- **What**: GitHub Actions builds SPA image → pushes to ACR → `cosign sign --yes $IMAGE@$DIGEST` using GitHub OIDC keyless. Signature stored alongside image in ACR as OCI artifact.
-- **Why**: pure attestation step. Produces evidence; doesn't enforce. **Required by 3.7** (the enforcement gate).
-- **Where configured**: `.github/workflows/build-spa.yml` (or extend `scripts/08-build-and-push-spa.sh`); requires `id-token: write` permission (already have). Nothing in Azure portal.
-- **Risk**: low. Pure-additive.
-- **Verify**: `cosign verify --certificate-identity-regexp 'https://github.com/tonzking123/dsolab/.*' --certificate-oidc-issuer https://token.actions.githubusercontent.com $IMAGE@$DIGEST` returns OK. `oras discover -o tree $IMAGE` shows attached `.sig` artifact.
+### 3.6 Cosign signing in CI — ✅ DONE 2026-05-24 (build-time provenance)
+- ~~**What**: GitHub Actions builds SPA image → pushes to ACR → `cosign sign --yes $IMAGE@$DIGEST` using GitHub OIDC keyless.~~ Landed via PR #32 + ADR 0017.
+- Workflow: `.github/workflows/build-spa.yml` (build + push + sign in one job; cosign sanity-check verify inline).
+- First signed image proves the loop: `acrdsolabxsqb.azurecr.io/dsolab/spa:be79d39` + signature `sha256-006f...sig`.
+- Verify from any machine:
+  ```bash
+  cosign verify \
+    --certificate-identity-regexp 'https://github.com/tonzking123/dsolab/.github/workflows/build-spa.yml.*' \
+    --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+    acrdsolabxsqb.azurecr.io/dsolab/spa:latest
+  ```
+- **Note**: `scripts/08-build-and-push-spa.sh` now banner-marked as DEV-ITERATION ONLY — unsigned local builds will be rejected by 3.7's admission once on.
 
 ### 3.7 Defender Image Integrity — ⏳ NEXT (admission / gated deployment)
 - **What**: AKS admission controller that rejects pods whose images aren't signed by our CI's GitHub OIDC identity **AND** have no Critical CVE findings from Defender's MDVM scanner.
@@ -456,6 +462,7 @@ Goal: prove the stack catches a real recent RCE end-to-end. **Quantify which lay
 - **0014** — n8n Code-node vm2 sandbox quirks (`require`, `process.env`, `URLSearchParams`)
 - **0015** — Phase 2 supply-chain gates (CodeQL + Trivy + Checkov + Dependabot; Defender substitutions explained)
 - **0016** — Use Defender for Cloud Image Integrity instead of raw Ratify for the 3.7 admission gate (Microsoft-managed Ratify; single Azure Policy syntax; gates on BOTH signature AND vulnerability findings)
+- **0017** — SPA build+push+sign runs in CI, not from a laptop (signing identity = `repo:tonzking123/dsolab:ref:refs/heads/main` GitHub OIDC subject; required for 3.7 Image Integrity policy to trust a stable, non-human identity)
 
 ### Operational state captured (out-of-band changes, not yet in dedicated ADRs)
 - **Dependabot security updates**: enabled via `gh api PUT repos/.../automated-security-fixes` (not expressible as a repo file)
