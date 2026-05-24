@@ -30,6 +30,22 @@ spec:
           ports:
             - name: http
               containerPort: 8080
+          # Container-level hardening — SPA is just nginx serving static
+          # built assets. Nothing should be writing to the root FS at runtime;
+          # nginx's own writable paths get tmpfs mounts. See ADR-0019.
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+            # seccompProfile is inherited from pod-level spec.securityContext
+          volumeMounts:
+            - name: nginx-cache
+              mountPath: /var/cache/nginx
+            - name: nginx-run
+              mountPath: /var/run
+            - name: tmp
+              mountPath: /tmp
           readinessProbe:
             httpGet:
               path: /healthz
@@ -47,3 +63,13 @@ spec:
             limits:
               cpu: "100m"
               memory: "64Mi"
+      volumes:
+        - name: nginx-cache
+          emptyDir:
+            sizeLimit: 64Mi
+        - name: nginx-run
+          emptyDir:
+            sizeLimit: 16Mi
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
