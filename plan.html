@@ -57,6 +57,12 @@ ul, ol { padding-left: 24px; }
 li { margin: 4px 0; }
 .callout { background: var(--panel); border-left: 4px solid var(--accent); padding: 12px 16px; border-radius: 4px; margin: 16px 0; }
 .phase { background: var(--panel); padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: 600; color: var(--accent); border: 1px solid var(--accent); display: inline-block; }
+.status { padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: 600; display: inline-block; margin-left: 8px; }
+.status-done { background: rgba(126,231,135,0.15); color: var(--accent-2); border: 1px solid var(--accent-2); }
+.status-partial { background: rgba(240,136,62,0.15); color: var(--warn); border: 1px solid var(--warn); }
+.status-next { background: rgba(88,166,255,0.15); color: var(--accent); border: 1px solid var(--accent); }
+.callout.warn { border-left-color: var(--warn); }
+.callout.tip { border-left-color: var(--accent-2); }
 .label { display: inline-block; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; padding: 2px 8px; border-radius: 3px; margin-right: 6px; }
 .label-do { background: rgba(88,166,255,0.15); color: var(--accent); }
 .label-git { background: rgba(126,231,135,0.15); color: var(--accent-2); }
@@ -244,7 +250,10 @@ flowchart LR
 </ol>
 <p><strong>Verify</strong>: <code>az login</code>, <code>gh auth login</code> succeed; PIM activation works; budget alert test-fires.</p>
 
-<h2 id="phase-1">Phase 1 — Pure DevOps <span class="phase">no security gates</span></h2>
+<h2 id="phase-1">Phase 1 — Pure DevOps <span class="phase">no security gates</span> <span class="status status-done">✅ DONE 2026-05-23</span></h2>
+<div class="callout tip">
+<strong>Status:</strong> end-to-end chat working at <code>https://chat.20.195.16.7.nip.io/</code>. SPA → MSAL → oauth2-proxy (JWT bearer) → n8n → workload identity → <code>gpt-4o</code> returns replies. PRs #6–#13 cover the work. ADRs 0011–0014 captured runtime decisions made during build (NGINX single-replica, Azure Disk PVC over Files, AKS 3 nodes, n8n vm2 sandbox quirks).
+</div>
 <p>Goal: working SPA → oauth2-proxy → n8n → Azure OpenAI on AKS, deployed by GitHub Actions. <strong>Split into 6 PR-sized sub-phases.</strong></p>
 
 <div class="task-block" id="p1a">
@@ -312,7 +321,27 @@ flowchart LR
   <li><code>git log --oneline main</code> shows 6 merged PRs from 1A through 1F.</li>
 </ol>
 
-<h2 id="phase-2">Phase 2 — Shift-left security <span class="phase">GHAS + Defender CLI</span></h2>
+<h2 id="phase-2">Phase 2 — Shift-left security <span class="phase">GHAS + Defender CLI</span> <span class="status status-partial">🟡 PARTIAL 2026-05-24</span></h2>
+<div class="callout warn">
+<strong>Status snapshot:</strong> GHAS half is live (CodeQL, secret scanning + push protection, Dependabot, branch protection). Defender-dependent items (2A, 2A.1, 2C, 2E) <strong>deferred to Phase 3</strong> because they require Defender for Cloud plans on — ADR 0001 deliberately keeps Defender off until Phase 3 to keep the build phase clean. 2C (image scan) and 2D (IaC scan) were <strong>substituted with OSS equivalents</strong> (Trivy, standalone Checkov) so the gates exist today; we'll swap to the Microsoft-bundled equivalents in Phase 3 when Defender turns on. See <strong>ADR 0015</strong> for the substitution rationale. PR #16 + #17 + #29 ship the actual gates, triage tracking, and plan update.
+
+<table style="margin-top: 12px;">
+<tr><th>Plan item</th><th>Status</th><th>Reality</th></tr>
+<tr><td>2A Defender for DevOps connector</td><td>⏭️ → Phase 3</td><td>Needs Defender CSPM on</td></tr>
+<tr><td>2A.1 DevOps posture mgmt</td><td>⏭️ → Phase 3</td><td>Depends on 2A</td></tr>
+<tr><td>2B CodeQL + secret scanning + Dependabot</td><td>✅ done</td><td>PR #16</td></tr>
+<tr><td>2B branch protection on <code>main</code></td><td>✅ done</td><td>PR required, no force-push/delete, linear history, conversation resolution. Required status checks deferred (path-filter conflict, see below)</td></tr>
+<tr><td>2C Defender CLI image scan</td><td>🔄 substituted with Trivy</td><td>Same gate purpose; ADR 0015</td></tr>
+<tr><td>2D MSDO (Checkov+Terrascan+KubeLinter)</td><td>🔄 substituted with standalone Checkov</td><td>Same Checkov engine; Terrascan/KubeLinter coverage missing; ADR 0015</td></tr>
+<tr><td>2D blocking on findings</td><td>⏭️ informational at intro</td><td>95 inherited findings; issue #17 tracks triage; flip to blocking once green</td></tr>
+<tr><td>2E SBOM + cosign</td><td>⏭️ → Phase 3</td><td>Co-locating with Ratify admission policy (no consumer without it)</td></tr>
+<tr><td>2F.1 Zero Azure secrets</td><td>✅ verified</td><td><code>gh secret list</code> empty; all OIDC</td></tr>
+<tr><td>2F.2 Zero Defender tokens</td><td>✅ N/A</td><td>No Defender yet</td></tr>
+<tr><td>2F.3 Push-protection → webhook</td><td>⏭️ → Phase 3</td><td>Pending Slack/Teams webhook URL</td></tr>
+</table>
+
+<p style="margin-top: 12px;"><strong>Footnote on required status checks:</strong> our security workflows use <code>paths:</code> filters (only run when relevant files change). Marking them as required would deadlock PRs that touch unrelated paths. Real fix: rewrite workflows so the job always runs but skips work when paths don't match, then add as required. Tracked as follow-up.</p>
+</div>
 <p>Goal: every PR gated. Vulnerabilities caught <strong>before</strong> AKS. Findings flow into Defender for Cloud for code-to-runtime context.</p>
 
 <h3>2A. Defender for DevOps GitHub connector</h3>
@@ -369,7 +398,17 @@ flowchart LR
   <li>GHAS Security tab + Defender DevOps inventory show matching findings.</li>
 </ol>
 
-<h2 id="phase-3">Phase 3 — Cluster & runtime <span class="phase">Defender for Containers + hardening</span></h2>
+<h2 id="phase-3">Phase 3 — Cluster & runtime <span class="phase">Defender for Containers + hardening</span> <span class="status status-next">⏳ NEXT</span></h2>
+<div class="callout">
+<strong>Absorbs from Phase 2 (deferred):</strong>
+<ul style="margin: 6px 0;">
+<li>2A Defender for DevOps GitHub connector (gives Azure-side aggregation of the SARIF that CodeQL/Trivy/Checkov already produce)</li>
+<li>2A.1 DevOps posture management (free output of 2A)</li>
+<li>2C swap Trivy → Defender for Cloud CLI for image scan (same gate, MDVM-backed, results land in Defender portal)</li>
+<li>2E SBOM (syft) + cosign signing — co-located with 3.2's Ratify admission policy because that's the consumer</li>
+<li>2F.3 Push-protection webhook (when a Slack/Teams URL is available)</li>
+</ul>
+</div>
 
 <h3>3.1 Defender plans</h3>
 <ul>
