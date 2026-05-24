@@ -3,7 +3,7 @@
 > **Purpose of this doc**: capture the current state of GitHub Advanced Security
 > (GHAS) licensing for our DevSecOps lab, how our setup aligns (or doesn't) with
 > Microsoft's published Defender for Cloud DevOps integration story, and what
-> would change if we migrate `tonzking123/dsolab` from a personal account to a
+> would change if we migrate `NovelAMG/dsolab` from a personal account to a
 > GitHub Enterprise org with GHAS enabled. Drop this into a new chat to scope a
 > migration plan.
 
@@ -11,7 +11,7 @@
 
 ## 1. TL;DR
 
-- We are running the **OSS half** of Phase 2 supply-chain security on a public personal-account repo (`tonzking123/dsolab`).
+- We are running the **OSS half** of Phase 2 supply-chain security on a public personal-account repo (`NovelAMG/dsolab`).
 - We get the **scanning** half: CodeQL, secret scanning, push protection, Dependabot, Trivy, Checkov — all working, findings in GitHub Security tab + Defender for Cloud DevOps view.
 - We do NOT get the **enrichment** half: runtime-aware alert prioritization, one-click GitHub issues with runtime context, code-to-runtime mapping, Copilot Autofix. **These all require a paid GHAS license**.
 - A GHAS license requires a paid **GitHub Enterprise Cloud** subscription. **Cannot be bought standalone**. Cheapest entry point ≈ **$70/user/month** for one solo person.
@@ -130,7 +130,7 @@ Three mapping methods exist in the doc — we have **none**:
 
 ```dockerfile
 # spa/Dockerfile — add OCI labels (Option 2)
-LABEL org.opencontainers.image.source="https://github.com/tonzking123/dsolab"
+LABEL org.opencontainers.image.source="https://github.com/NovelAMG/dsolab"
 LABEL org.opencontainers.image.revision="${VITE_GIT_SHA}"
 ```
 
@@ -229,7 +229,7 @@ gh api orgs/<ORG-NAME>/repos --paginate \
 2. github.com/organizations/tonzking-lab/billing/upgrade
    → start "Enterprise Cloud" 30-day trial
 
-3. github.com/tonzking123/dsolab/settings
+3. github.com/NovelAMG/dsolab/settings
    → Transfer ownership → new owner = tonzking-lab
    → Old URL auto-redirects
 
@@ -256,9 +256,9 @@ during Phase 1. Each needs an explicit update:
 
 | What breaks | Why | How to fix |
 |---|---|---|
-| **TF apply workflow (OIDC)** | Federated credential on `mi-gha-dsolab` MI is bound to `repo:tonzking123/dsolab:ref:refs/heads/main` and `repo:tonzking123/dsolab:pull_request` | Update FIC subjects via Terraform or `az identity federated-credential update` to `repo:tonzking-lab/dsolab:...` |
+| **TF apply workflow (OIDC)** | Federated credential on `mi-gha-dsolab` MI is bound to `repo:NovelAMG/dsolab:ref:refs/heads/main` and `repo:NovelAMG/dsolab:pull_request` | Update FIC subjects via Terraform or `az identity federated-credential update` to `repo:tonzking-lab/dsolab:...` |
 | **Defender DevOps connector OAuth scope** | OAuth grant scoped to `tonzking123` org with explicit repo list (`dsolab`, `DevSecOps-Demo`) | Update grant via GitHub App settings to include `tonzking-lab` org + `dsolab` repo |
-| **Workflow file references to repo path** | Cosmetic — comments or error messages mention `tonzking123/dsolab` | Search & replace in `.github/workflows/*.yml` and `scripts/*.sh` |
+| **Workflow file references to repo path** | Cosmetic — comments or error messages mention `NovelAMG/dsolab` | Search & replace in `.github/workflows/*.yml` and `scripts/*.sh` |
 | **Branch protection rule on `main`** | Stays — it's per-repo | None |
 | **Open PRs** | Stay — PR numbers preserved | None |
 | **Issue history** | Stays — moves with the repo | None |

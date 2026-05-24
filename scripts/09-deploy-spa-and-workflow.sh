@@ -9,7 +9,7 @@ set -euo pipefail
 PREFIX="${PREFIX:-dsolab}"
 RG_NAME="${RG_NAME:-rg-${PREFIX}-sea}"
 NAMESPACE="${NAMESPACE:-n8n}"
-GH_REPO="${GH_REPO:-tonzking123/dsolab}"
+GH_REPO="${GH_REPO:-NovelAMG/dsolab}"
 KV_NAME="${KV_NAME:-}"
 ACR_NAME="${ACR_NAME:-}"
 IMAGE_TAG="${IMAGE_TAG:-}"

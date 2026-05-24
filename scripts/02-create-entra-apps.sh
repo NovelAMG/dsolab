@@ -12,7 +12,7 @@ set -euo pipefail
 
 # ---------- Config ----------
 PREFIX="${PREFIX:-dsolab}"
-GH_REPO="${GH_REPO:-tonzking123/dsolab}"
+GH_REPO="${GH_REPO:-NovelAMG/dsolab}"
 
 N8N_API_DISPLAY="n8n-api-${PREFIX}"
 SPA_DISPLAY="spa-${PREFIX}"

@@ -5,7 +5,7 @@
 #
 #   1. The image is built by a known, audited GitHub Actions run.
 #   2. The cosign signature's certificate identity is the GitHub OIDC subject
-#      `repo:tonzking123/dsolab:ref:refs/heads/main` — cryptographic proof that
+#      `repo:NovelAMG/dsolab:ref:refs/heads/main` — cryptographic proof that
 #      our main branch's CI produced this image. NOT a human laptop.
 #   3. Phase 3.7's Defender for Cloud Image Integrity policy can then trust that
 #      identity and reject any image without a matching signature.

@@ -112,7 +112,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 36px 0; }
 <div class="kicker">DevSecOps Lab — Reference Document</div>
 <h1>GHAS License &amp; Story Alignment</h1>
 <p class="subtitle">
-Current state of GitHub Advanced Security licensing for <code>tonzking123/dsolab</code>,
+Current state of GitHub Advanced Security licensing for <code>NovelAMG/dsolab</code>,
 how our setup aligns with Microsoft's published Defender for Cloud + DevOps story,
 and what would change if we migrate to a GitHub Enterprise org with GHAS enabled.
 Hand this to a fresh chat to scope a migration plan.
@@ -143,7 +143,7 @@ Section 7 lists the questions a new chat should ask before doing anything destru
 <h2 id="tldr">1. TL;DR</h2>
 
 <ul>
-  <li>We are running the <strong>OSS half</strong> of Phase 2 supply-chain security on a public personal-account repo (<code>tonzking123/dsolab</code>).</li>
+  <li>We are running the <strong>OSS half</strong> of Phase 2 supply-chain security on a public personal-account repo (<code>NovelAMG/dsolab</code>).</li>
   <li>We get the <strong>scanning</strong> half: CodeQL, secret scanning, push protection, Dependabot, Trivy, Checkov — all working, findings in GitHub Security tab + Defender for Cloud DevOps view.</li>
   <li>We do NOT get the <strong>enrichment</strong> half: runtime-aware alert prioritization, one-click GitHub issues with runtime context, code-to-runtime mapping, Copilot Autofix. <strong>These all require a paid GHAS license</strong>.</li>
   <li>A GHAS license requires a paid <strong>GitHub Enterprise Cloud</strong> subscription. <strong>Cannot be bought standalone.</strong> Cheapest entry point ≈ <strong>$70/user/month</strong> for one solo person.</li>
@@ -262,7 +262,7 @@ Without code-to-cloud mapping, the trace breaks at the image — we can't link b
 
 <h4>Easy fix today (no GHAS license needed)</h4>
 <pre><code># spa/Dockerfile — add OCI labels (Option 2)
-LABEL org.opencontainers.image.source="https://github.com/tonzking123/dsolab"
+LABEL org.opencontainers.image.source="https://github.com/NovelAMG/dsolab"
 LABEL org.opencontainers.image.revision="${VITE_GIT_SHA}"</code></pre>
 
 <p>Plus <code>--build-arg VITE_GIT_SHA=$(git rev-parse HEAD)</code> in the build script.</p>
@@ -369,7 +369,7 @@ flowchart LR
 2. github.com/organizations/tonzking-lab/billing/upgrade
    → start "Enterprise Cloud" 30-day trial
 
-3. github.com/tonzking123/dsolab/settings
+3. github.com/NovelAMG/dsolab/settings
    → Transfer ownership → new owner = tonzking-lab
    → Old URL auto-redirects
 
@@ -396,9 +396,9 @@ during Phase 1. Each needs an explicit update.</strong>
 
 <table>
 <tr><th>What breaks</th><th>Why</th><th>How to fix</th></tr>
-<tr><td><strong>TF apply workflow (OIDC)</strong></td><td>Federated credential on <code>mi-gha-dsolab</code> MI is bound to <code>repo:tonzking123/dsolab:ref:refs/heads/main</code> and <code>repo:tonzking123/dsolab:pull_request</code></td><td>Update FIC subjects via Terraform or <code>az identity federated-credential update</code> to <code>repo:tonzking-lab/dsolab:...</code></td></tr>
+<tr><td><strong>TF apply workflow (OIDC)</strong></td><td>Federated credential on <code>mi-gha-dsolab</code> MI is bound to <code>repo:NovelAMG/dsolab:ref:refs/heads/main</code> and <code>repo:NovelAMG/dsolab:pull_request</code></td><td>Update FIC subjects via Terraform or <code>az identity federated-credential update</code> to <code>repo:tonzking-lab/dsolab:...</code></td></tr>
 <tr><td><strong>Defender DevOps connector OAuth scope</strong></td><td>OAuth grant scoped to <code>tonzking123</code> org with explicit repo list (<code>dsolab</code>, <code>DevSecOps-Demo</code>)</td><td>Update grant via GitHub App settings to include <code>tonzking-lab</code> org + <code>dsolab</code> repo</td></tr>
-<tr><td><strong>Workflow file references to repo path</strong></td><td>Cosmetic — comments or error messages mention <code>tonzking123/dsolab</code></td><td>Search &amp; replace in <code>.github/workflows/*.yml</code> and <code>scripts/*.sh</code></td></tr>
+<tr><td><strong>Workflow file references to repo path</strong></td><td>Cosmetic — comments or error messages mention <code>NovelAMG/dsolab</code></td><td>Search &amp; replace in <code>.github/workflows/*.yml</code> and <code>scripts/*.sh</code></td></tr>
 <tr><td>Branch protection rule on <code>main</code></td><td>Stays — it's per-repo</td><td>None</td></tr>
 <tr><td>Open PRs</td><td>Stay — PR numbers preserved</td><td>None</td></tr>
 <tr><td>Issue history</td><td>Stays — moves with the repo</td><td>None</td></tr>

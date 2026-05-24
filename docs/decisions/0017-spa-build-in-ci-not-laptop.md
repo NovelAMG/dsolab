@@ -17,7 +17,7 @@ for the cosign signing step in Phase 3.6:
 | Path | Where signing happens | Signer identity |
 |---|---|---|
 | **A — local script** | `scripts/08-build-and-push-spa.sh` on the engineer's laptop | The engineer's local cosign keypair OR their personal GitHub OIDC token |
-| **B — CI workflow** (chosen) | `.github/workflows/build-spa.yml` on a GitHub-hosted runner | `repo:tonzking123/dsolab:ref:refs/heads/main` GitHub OIDC subject |
+| **B — CI workflow** (chosen) | `.github/workflows/build-spa.yml` on a GitHub-hosted runner | `repo:NovelAMG/dsolab:ref:refs/heads/main` GitHub OIDC subject |
 
 Until today, the SPA was built and pushed manually via the local script.
 There was no CI for the SPA — only Terraform had CI/CD.
@@ -34,7 +34,7 @@ iteration but production images flow through git history.
    from "Thobthuan's laptop" tells admission "trust whoever has Thobthuan's
    laptop today" — including a stolen laptop, a borrowed one, or
    credential-stuffed cosign keys. A signature from
-   `repo:tonzking123/dsolab:ref:refs/heads/main` tells admission "trust
+   `repo:NovelAMG/dsolab:ref:refs/heads/main` tells admission "trust
    what our main branch's CI produced" — cryptographically tied to the
    GitHub OIDC issuer and the exact workflow file path.
 
@@ -79,7 +79,7 @@ iteration but production images flow through git history.
 - The local script becomes "dev iteration only" — production builds
   cannot accidentally land in main without an audit trail.
 - Phase 3.7's admission policy can reference a stable OIDC subject:
-  `https://github.com/tonzking123/dsolab/.github/workflows/build-spa.yml@refs/heads/main`.
+  `https://github.com/NovelAMG/dsolab/.github/workflows/build-spa.yml@refs/heads/main`.
 - Adds a second meaningful CI workflow for the application (alongside
   the security gates from Phase 2), making the lab look more like a
   realistic production setup.

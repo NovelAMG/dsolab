@@ -41,7 +41,7 @@ The script will:
 
 ### On terminal
 ```bash
-gh variable list --repo tonzking123/dsolab
+gh variable list --repo NovelAMG/dsolab
 # Should include N8N_API_APP_ID, N8N_API_APP_URI, SPA_APP_ID (alongside the existing AZURE_* and TF_STATE_*)
 ```
 
@@ -125,7 +125,7 @@ az ad app list --display-name "spa-dsolab"     --query "[].appId" -o tsv
 # Expected: one appId each
 
 # 3. GitHub variables set
-gh variable list --repo tonzking123/dsolab | grep -E "(SPA_APP_ID|N8N_API_APP_ID|N8N_API_APP_URI)"
+gh variable list --repo NovelAMG/dsolab | grep -E "(SPA_APP_ID|N8N_API_APP_ID|N8N_API_APP_URI)"
 # Expected: 3 rows
 
 # 4. Terraform created the identity

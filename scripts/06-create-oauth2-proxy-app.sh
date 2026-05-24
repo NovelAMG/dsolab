@@ -25,7 +25,7 @@ set -euo pipefail
 # ---------- Config ----------
 PREFIX="${PREFIX:-dsolab}"
 RG_NAME="${RG_NAME:-rg-${PREFIX}-sea}"
-GH_REPO="${GH_REPO:-tonzking123/dsolab}"
+GH_REPO="${GH_REPO:-NovelAMG/dsolab}"
 APP_NAME="oauth2-proxy-${PREFIX}"
 KV_NAME="${KV_NAME:-}"
 

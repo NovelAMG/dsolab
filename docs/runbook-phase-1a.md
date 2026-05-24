@@ -10,7 +10,7 @@
 - [ ] `az account show` works (you are logged in to the **right subscription**)
 - [ ] `gh --version` works; `gh auth status` shows you're logged into `github.com`
 - [ ] You have **Owner** on the subscription (or Contributor **+** User Access Administrator)
-- [ ] The empty repo `tonzking123/dsolab` exists on GitHub
+- [ ] The empty repo `NovelAMG/dsolab` exists on GitHub
 - [ ] Your local `~/Desktop/DevSecOps-True` is git-initialized and `origin` points at the GitHub repo
 
 If `origin` is not set yet:
@@ -18,7 +18,7 @@ If `origin` is not set yet:
 cd ~/Desktop/DevSecOps-True
 git init
 git branch -M main
-git remote add origin https://github.com/tonzking123/dsolab.git
+git remote add origin https://github.com/NovelAMG/dsolab.git
 ```
 
 ## Step 1 — Run the bootstrap script
@@ -35,7 +35,7 @@ The script will:
 4. Create user-assigned managed identity `mi-gha-dsolab` for GitHub Actions OIDC.
 5. Create 2 federated credentials on the MI (one for `main` pushes, one for PRs).
 6. Assign roles: Contributor + User Access Administrator on the RG, Storage Blob Data Contributor on the state container.
-7. Set 7 repo variables on `tonzking123/dsolab` via `gh variable set`.
+7. Set 7 repo variables on `NovelAMG/dsolab` via `gh variable set`.
 8. Print the storage account name and a one-liner for `terraform init`.
 
 **Watch for**: at the end, you should see `✓ Bootstrap complete!` with all 7 GitHub variables listed.
@@ -47,8 +47,8 @@ The script will:
 ### In Azure portal
 - Resource groups → `rg-dsolab-sea` → should show **2 resources**: the storage account and the managed identity.
 - Open the managed identity → **Federated credentials** blade → should show **2 entries** with subjects:
-  - `repo:tonzking123/dsolab:ref:refs/heads/main`
-  - `repo:tonzking123/dsolab:pull_request`
+  - `repo:NovelAMG/dsolab:ref:refs/heads/main`
+  - `repo:NovelAMG/dsolab:pull_request`
 
 ### In GitHub repo settings
 - Settings → Secrets and variables → Actions → **Variables** tab → should show **7 variables**.
@@ -56,8 +56,8 @@ The script will:
 
 ### On terminal
 ```bash
-gh variable list --repo tonzking123/dsolab
-gh secret list --repo tonzking123/dsolab   # should print nothing
+gh variable list --repo NovelAMG/dsolab
+gh secret list --repo NovelAMG/dsolab   # should print nothing
 ```
 
 ## Step 3 — Commit and push the scaffold
@@ -95,7 +95,7 @@ If you ran `git checkout -b infra/01-bootstrap` + `git push -u origin infra/01-b
 # Rename your feature branch to main locally + push as main + set default + clean up
 git branch -m infra/01-bootstrap main
 git push -u origin main
-gh repo edit tonzking123/dsolab --default-branch main
+gh repo edit NovelAMG/dsolab --default-branch main
 git push origin --delete infra/01-bootstrap
 gh workflow run hello-world.yml --ref main
 ```
@@ -109,7 +109,7 @@ gh run list --workflow="hello-world.yml" --limit 1
 #    Expected: 1 row, "completed success"
 
 # 2. No secrets in the repo
-gh secret list --repo tonzking123/dsolab
+gh secret list --repo NovelAMG/dsolab
 #    Expected: empty (only variables are set, which is fine)
 
 # 3. main is the default branch and has the scaffold
@@ -119,10 +119,10 @@ git log --oneline -3
 
 # 4. Local terraform init works
 terraform -chdir=terraform/envs/lab init \
-  -backend-config="resource_group_name=$(gh variable get TF_STATE_RG --repo tonzking123/dsolab)" \
-  -backend-config="storage_account_name=$(gh variable get TF_STATE_SA --repo tonzking123/dsolab)" \
-  -backend-config="container_name=$(gh variable get TF_STATE_CONTAINER --repo tonzking123/dsolab)" \
-  -backend-config="key=$(gh variable get TF_STATE_KEY --repo tonzking123/dsolab)"
+  -backend-config="resource_group_name=$(gh variable get TF_STATE_RG --repo NovelAMG/dsolab)" \
+  -backend-config="storage_account_name=$(gh variable get TF_STATE_SA --repo NovelAMG/dsolab)" \
+  -backend-config="container_name=$(gh variable get TF_STATE_CONTAINER --repo NovelAMG/dsolab)" \
+  -backend-config="key=$(gh variable get TF_STATE_KEY --repo NovelAMG/dsolab)"
 #    Expected: "Terraform has been successfully initialized!"
 
 # 5. terraform plan against the (empty) lab shows no changes
@@ -136,11 +136,11 @@ terraform -chdir=terraform/envs/lab plan
 |---|---|---|
 | `az: command not found` | Azure CLI not installed | `brew install azure-cli` |
 | `gh: command not found` | GitHub CLI not installed | `brew install gh` |
-| `Failed to validate identity provider` in workflow | FIC subject mismatch | Verify FIC subject in Azure portal matches `repo:tonzking123/dsolab:ref:refs/heads/main` exactly (no trailing whitespace, exact case) |
+| `Failed to validate identity provider` in workflow | FIC subject mismatch | Verify FIC subject in Azure portal matches `repo:NovelAMG/dsolab:ref:refs/heads/main` exactly (no trailing whitespace, exact case) |
 | `403 AuthorizationFailed` in workflow | RBAC not propagated yet | Wait 5 min, then re-run via Actions tab → Re-run workflow |
 | `Storage account name already taken` | Random suffix collision (extremely rare) | Re-run the script — it generates a new 4-hex suffix |
 | `terraform init` says "Failed to get existing workspaces" with 403 | You don't have Blob Data Contributor on the container | The bootstrap script grants it to your user; re-run the script, or assign manually via portal |
-| Bootstrap script exits with "repo not found" | Repo not created on GitHub yet | `gh repo create tonzking123/dsolab --private --confirm` |
+| Bootstrap script exits with "repo not found" | Repo not created on GitHub yet | `gh repo create NovelAMG/dsolab --private --confirm` |
 | Bootstrap script exits with "Insufficient privileges" on role assignment | You don't have Owner / UAA on the subscription | Escalate via PIM, or ask sub owner to run the script |
 | `gh pr create --fill` exits code 1 silently | First push went to a feature branch on an empty repo — `main` doesn't exist, default branch is your feature branch, base == head | See Step 5 above: rename feature branch to `main`, push, set default, delete old branch |
 
