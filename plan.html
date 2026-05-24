@@ -409,8 +409,8 @@ flowchart LR
 <tr><td>3.3</td><td>Runtime sensor on AKS</td><td>✅ done (AKS add-on)</td><td>8 Defender pods in <code>kube-system</code>. ADR 0001 deferral ended.</td></tr>
 <tr><td>3.4</td><td>NetworkPolicy default-deny in <code>n8n</code> ns</td><td>⏸️ deferred</td><td>Will revisit; low priority for solo lab</td></tr>
 <tr><td>3.5</td><td>Key Vault CSI</td><td>⏸️ deferred</td><td>Same</td></tr>
-<tr><td><strong>3.6</strong></td><td><strong>Cosign signing in CI</strong> (build-time attestation)</td><td>⏳ NEXT</td><td>Pre-req for 3.7</td></tr>
-<tr><td><strong>3.7</strong></td><td><strong>Defender Image Integrity</strong> (gated deployment on signature + CVE)</td><td>⏳ NEXT</td><td>Portal toggle + Azure Policy. Consumes 3.6 signatures. ADR 0016</td></tr>
+<tr><td><strong>3.6</strong></td><td><strong>Cosign signing in CI</strong> (build-time attestation)</td><td>✅ done 2026-05-24</td><td>PR #32. First signed image: <code>dsolab/spa:be79d39</code> + signature <code>sha256-006f....sig</code>. Identity: <code>repo:tonzking123/dsolab:ref:refs/heads/main</code> via GitHub OIDC keyless. ADR 0017.</td></tr>
+<tr><td><strong>3.7</strong></td><td><strong>Defender Image Integrity</strong> (gated deployment on signature + CVE)</td><td>⏳ NEXT</td><td>Now has signatures to verify. ADR 0016</td></tr>
 <tr><td>3.8</td><td>Switch Defender sensor add-on → Helm</td><td>🔜 later</td><td>Unlocks Antimalware + Binary drift <strong>blocking</strong> (preview); plan before Phase 5 detonation</td></tr>
 <tr><td>3.9</td><td>Ingress hardening (AFD/WAF, AOAI private endpoint)</td><td>🔜 later</td><td>Was 3.3 in original numbering</td></tr>
 <tr><td>3.10</td><td>Logging + drift detection</td><td>🔜 later</td><td>Was 3.4. Binary drift DETECTION already on (no Helm needed)</td></tr>
@@ -452,11 +452,15 @@ flowchart LR
   <li>Deferred for same reason as 3.4</li>
 </ul>
 
-<h3>3.6 Cosign signing in CI <span class="status status-next">⏳ NEXT</span> <small>(build-time provenance)</small></h3>
-<p><span class="label label-do">Do</span> Extend CI: after build+push, run <code>cosign sign --yes $IMAGE@$DIGEST</code> using GitHub OIDC keyless. Signature stored as OCI artifact alongside the image in ACR.</p>
-<p><span class="label label-why">Why</span> Pure attestation; produces evidence, doesn't enforce. Required by 3.7.</p>
-<p><span class="label label-verify">Verify</span> <code>cosign verify --certificate-identity-regexp 'https://github.com/tonzking123/dsolab/.*' --certificate-oidc-issuer https://token.actions.githubusercontent.com $IMAGE@$DIGEST</code> → OK. <code>oras discover -o tree $IMAGE</code> shows attached <code>.sig</code>.</p>
-<p><span class="label label-gotcha">Gotcha</span> Workflow needs <code>id-token: write</code> permission (we already have this for OIDC).</p>
+<h3>3.6 Cosign signing in CI <span class="status status-done">✅ DONE 2026-05-24</span> <small>(build-time provenance)</small></h3>
+<p>Landed via <strong>PR #32</strong> + <strong>ADR 0017</strong>. Workflow <code>.github/workflows/build-spa.yml</code> builds the SPA, pushes to ACR, then signs with cosign keyless using GitHub OIDC — all in one job. Cosign verify runs inline as a sanity check against the same OIDC subject 3.7 will trust.</p>
+<p>First signed image: <code>acrdsolabxsqb.azurecr.io/dsolab/spa:be79d39</code><br>Signature artifact: <code>sha256-006f529f3ac1f821a11df76c54870f110aa957b00e4832e4bf98c0ec4b04e175.sig</code></p>
+<p><strong>Verify from any machine:</strong></p>
+<pre><code>cosign verify \
+  --certificate-identity-regexp 'https://github.com/tonzking123/dsolab/.github/workflows/build-spa.yml.*' \
+  --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+  acrdsolabxsqb.azurecr.io/dsolab/spa:latest</code></pre>
+<p><span class="label label-gotcha">Note</span> <code>scripts/08-build-and-push-spa.sh</code> now banner-marked DEV-ITERATION ONLY. Unsigned local builds will be REJECTED by 3.7's admission once on — by design (ADR 0017).</p>
 
 <h3>3.7 Defender Image Integrity <span class="status status-next">⏳ NEXT</span> <small>(admission / gated deployment)</small></h3>
 <p><span class="label label-do">Do</span> Defender for Cloud → Workload protections → <strong>Image Integrity</strong> (preview) → enable for <code>aks-dsolab-sea</code> (or <code>az aks update --enable-image-integrity</code>). Microsoft auto-deploys Ratify in <code>gatekeeper-system</code>. Then write an Azure Policy assignment scoped to namespace <code>n8n</code> only.</p>
