@@ -1,0 +1,153 @@
+# Build SPA → push to ACR → sign with cosign (GitHub OIDC keyless).
+#
+# Phase 3.6 — supply-chain provenance. Moves what `scripts/08-build-and-push-spa.sh`
+# does today (manual, from a laptop) into CI, so:
+#
+#   1. The image is built by a known, audited GitHub Actions run.
+#   2. The cosign signature's certificate identity is the GitHub OIDC subject
+#      `repo:tonzking123/dsolab:ref:refs/heads/main` — cryptographic proof that
+#      our main branch's CI produced this image. NOT a human laptop.
+#   3. Phase 3.7's Defender for Cloud Image Integrity policy can then trust that
+#      identity and reject any image without a matching signature.
+#
+# The local script (scripts/08-build-and-push-spa.sh) stays for dev iteration,
+# but production builds flow through this workflow on every merge to main.
+# See ADR 0017 for the rationale.
+name: Build SPA + push + sign
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'spa/**'
+      - '.github/workflows/build-spa.yml'
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # needed for both Azure OIDC (ACR push) and cosign keyless (Sigstore)
+  contents: read
+
+concurrency:
+  # Serialize builds on the same ref. Cancelling a half-done push is safe —
+  # the registry GCs partial uploads.
+  group: build-spa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build, push, sign
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      ACR_NAME: acrdsolabxsqb
+      ACR_LOGIN_SERVER: acrdsolabxsqb.azurecr.io
+      IMAGE_REPO: dsolab/spa
+
+    outputs:
+      image-ref: ${{ steps.tag.outputs.tag }}
+      image-digest: ${{ steps.push.outputs.digest }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        # Same MI as the Terraform workflows (mi-gha-dsolab). Has Contributor on
+        # the RG, which covers AcrPush — no extra role assignment needed.
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: ACR login
+        run: az acr login --name "$ACR_NAME"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Compute image tag
+        id: tag
+        run: |
+          SHA_SHORT="${GITHUB_SHA::7}"
+          echo "tag=${ACR_LOGIN_SERVER}/${IMAGE_REPO}:${SHA_SHORT}" >> "$GITHUB_OUTPUT"
+          echo "sha_short=${SHA_SHORT}" >> "$GITHUB_OUTPUT"
+
+      - name: Build + push
+        id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: ./spa
+          file: ./spa/Dockerfile
+          push: true
+          platforms: linux/amd64
+          # Two tags: short SHA (immutable, what 3.7 will admit) + latest (for dev).
+          tags: |
+            ${{ steps.tag.outputs.tag }}
+            ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_REPO }}:latest
+          # Build args match the local script. Vite bakes these into the bundle
+          # at build time — they end up in the JS the browser downloads, so
+          # they're not secrets, they're public configuration.
+          build-args: |
+            VITE_SPA_CLIENT_ID=${{ vars.SPA_APP_ID }}
+            VITE_TENANT_ID=${{ vars.AZURE_TENANT_ID }}
+            VITE_N8N_API_SCOPE=${{ vars.N8N_API_APP_URI }}/access_as_user
+            VITE_REDIRECT_URI=https://${{ vars.INGRESS_HOST }}/auth/callback
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: 'v2.4.0'
+
+      - name: Sign image (keyless via GitHub OIDC)
+        # Pin the signature to the immutable digest, not the floating tag —
+        # this is what makes signature verification useful in admission.
+        env:
+          IMAGE_DIGEST: ${{ steps.push.outputs.digest }}
+          IMAGE_TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          echo "Signing ${IMAGE_TAG}@${IMAGE_DIGEST}"
+          cosign sign --yes "${IMAGE_TAG}@${IMAGE_DIGEST}"
+
+      - name: Verify signature (sanity check, same identity we'll trust in 3.7)
+        env:
+          IMAGE_DIGEST: ${{ steps.push.outputs.digest }}
+          IMAGE_TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          cosign verify \
+            --certificate-identity-regexp "https://github.com/${{ github.repository }}/\.github/workflows/build-spa\.yml.*" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            "${IMAGE_TAG}@${IMAGE_DIGEST}"
+
+      - name: Job summary
+        env:
+          IMAGE_DIGEST: ${{ steps.push.outputs.digest }}
+          IMAGE_TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          {
+            echo "## SPA build summary"
+            echo ""
+            echo "| Field | Value |"
+            echo "|---|---|"
+            echo "| Image (tag)    | \`${IMAGE_TAG}\` |"
+            echo "| Image (latest) | \`${ACR_LOGIN_SERVER}/${IMAGE_REPO}:latest\` |"
+            echo "| Digest         | \`${IMAGE_DIGEST}\` |"
+            echo "| Signed by      | \`repo:${{ github.repository }}:ref:${{ github.ref }}\` |"
+            echo "| Issuer         | \`https://token.actions.githubusercontent.com\` |"
+            echo ""
+            echo "### Verify from your laptop"
+            echo ""
+            echo '```bash'
+            echo "cosign verify \\"
+            echo "  --certificate-identity-regexp 'https://github.com/${{ github.repository }}/.github/workflows/build-spa.yml.*' \\"
+            echo "  --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \\"
+            echo "  ${IMAGE_TAG}@${IMAGE_DIGEST}"
+            echo '```'
+            echo ""
+            echo "### Deploy this image"
+            echo ""
+            echo '```bash'
+            echo "IMAGE_TAG=${IMAGE_TAG} ./scripts/09-deploy-spa-and-workflow.sh"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
