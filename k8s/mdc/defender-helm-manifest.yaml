@@ -1,0 +1,2016 @@
+---
+# Source: microsoft-defender-for-containers/charts/defender-admission-controller/templates/microsoftdefender-gating-admission-serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: "defender-admission-controller-serviceaccount"
+  labels:
+    app:  defender-admission-controller
+---
+# Source: microsoft-defender-for-containers/charts/microsoft-defender-for-containers-sensor/templates/service-accounts.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: microsoft-defender-collectors-sa
+  namespace: mdc
+  labels:
+    app.kubernetes.io/name:  defender-k8s-sensor
+    app.kubernetes.io/version:  0.10.36
+    chart: microsoft-defender-for-containers-sensor-0.10.36
+    release: defender-k8s
+    heritage: Helm
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: microsoft-defender-for-containers/charts/microsoft-defender-for-containers-sensor/templates/service-accounts.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: microsoft-defender-publisher-sa
+  namespace: mdc
+  labels:
+    app.kubernetes.io/name:  defender-k8s-sensor
+    app.kubernetes.io/version:  0.10.36
+    chart: microsoft-defender-for-containers-sensor-0.10.36
+    release: defender-k8s
+    heritage: Helm
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: microsoft-defender-for-containers/charts/defender-admission-controller/templates/microsoftdefender-gating-admission-secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: defender-admission-controller-server-cert
+---
+# Source: microsoft-defender-for-containers/charts/microsoft-defender-for-containers-sensor/templates/agent-secrets.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  # AKS uses 'microsoft-defender-ws-secret' — conditional to avoid upgrade regression
+  name: omsagent-secret
+  namespace: mdc
+  labels:
+    chart: microsoft-defender-for-containers-sensor-0.10.36
+    release: defender-k8s
+    heritage: Helm
+    app.kubernetes.io/managed-by: Helm
+type: Opaque
+data:
+  WSID: ""
+  KEY: ""
+  DOMAIN: "b3BpbnNpZ2h0cy5henVyZS5jb20="
+---
+# Source: microsoft-defender-for-containers/charts/defender-admission-controller/templates/crds/microsoftdefender-gating-admission-crds.yaml
+# security-artifact-policies-crd.yaml
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  labels:
+    kubernetes.azure.com/managedby: mdc
+    addonmanager.kubernetes.io/mode: Reconcile
+  name: securityartifactpolicies.defender.microsoft.com
+spec:
+  group: defender.microsoft.com
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: false
+    schema:
+      openAPIV3Schema:
+        description: SecurityArtifactPolicy is the Schema for the defender.microsoft.com artifact based policies that are enforced by the Microsoft Defender for Cloud (MDC) admission controller.
+        type: object
+        properties:
+          spec:
+            type: object
+            description: Specification of the policy.
+            properties:
+              vulnerabilityAssessmentGatedDeployment:
+                description: 'The "vulnerabilityAssessmentGatedDeployment" defines the list of vulnerability assessment gated deployment rules.'
+                type: array
+                items:
+                  type: object
+                  required:
+                  - action
+                  - name
+                  properties:
+                    name:
+                      description: 'The "name" defines the name of the rule.'
+                      type: string
+                    action:
+                      description: 'The "action" can be set to either "audit" or "deny". Default action is audit.'
+                      type: string
+                      enum: ["audit", "deny"] # Add more actions if needed
+                    configuration:
+                      description: 'The "configuration" sets specific aspects of the verification process.'
+                      type: object
+                      properties:
+                        maximumVaFileAge:
+                          type: string
+                          description: 'The "maximumVaFileAge" defines the maximum age of the vulnerability assessment artifact. Files older than this value will not be considered for verification.'
+                        maxAllowedSeverities:
+                          type: object
+                          description: 'The "maxAllowedSeverities" defines the maximum allowed severity levels for CVEs.'
+                          properties:
+                            critical:
+                              type: integer
+                            high:
+                              type: integer
+                            medium:
+                              type: integer
+                            low:
+                              type: integer
+                          anyOf:
+                          - required:
+                            - critical
+                          - required:
+                            - high
+                          - required:
+                            - medium
+                          - required:
+                            - low
+                        forbiddenCves:
+                          type: array
+                          description: 'The "forbiddenCves" defines a list of CVEs that will cause the verification process to fail.'
+                          items:
+                            type: string
+                        ignoredCves:
+                          type: array
+                          description: 'The "ignoredCves" defines a list of CVEs that will be ignored during the verification process.'
+                          items:
+                            type: string
+                    scope:
+                      description: 'The "scope" defines the conditions under which the rule applies. if not provided, scope is cluster wide'
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          matcherType:
+                            description: 'The "matcherType" defines the type of matcher used.'
+                            type: string
+                          anyOf:
+                            description: 'The "anyOf" defines a list of conditions.'
+                            type: array
+                            items:
+                              type: string
+                        required:
+                        - matcherType
+                        - anyOf
+                minItems: 0
+              policyLastEditTime:
+                description: 'The "policyLastEditTime" is the timestamp of when the policy was last edited.'
+                type: string
+                format: date-time
+            required:
+            - vulnerabilityAssessmentGatedDeployment
+  - name: v1alpha2
+    served: true
+    storage: false
+    schema:
+      openAPIV3Schema:
+        description: SecurityArtifactPolicy is the Schema for the defender.microsoft.com artifact based policies that are enforced by the Microsoft Defender for Cloud (MDC) admission controller.
+        type: object
+        properties:
+          spec:
+            type: object
+            description: Specification of the policy.
+            properties:
+              vulnerabilityAssessmentGatedDeployment:
+                description: 'The "vulnerabilityAssessmentGatedDeployment" defines the list of vulnerability assessment gated deployment rules.'
+                type: array
+                items:
+                  type: object
+                  required:
+                  - action
+                  - name
+                  properties:
+                    name:
+                      description: 'The "name" defines the name of the rule.'
+                      type: string
+                    action:
+                      description: 'The "action" can be set to either "audit" or "deny". Default action is audit.'
+                      type: string
+                      enum: ["audit", "deny"] # Add more actions if needed
+                    configuration:
+                      description: 'The "configuration" sets specific aspects of the verification process.'
+                      type: object
+                      properties:
+                        maximumVaFileAge:
+                          type: string
+                          description: 'The "maximumVaFileAge" defines the maximum age of the vulnerability assessment artifact. Files older than this value will not be considered for verification.'
+                        maxAllowedSeverities:
+                          type: object
+                          description: 'The "maxAllowedSeverities" defines the maximum allowed severity levels for CVEs.'
+                          properties:
+                            critical:
+                              type: integer
+                            high:
+                              type: integer
+                            medium:
+                              type: integer
+                            low:
+                              type: integer
+                          anyOf:
+                          - required:
+                            - critical
+                          - required:
+                            - high
+                          - required:
+                            - medium
+                          - required:
+                            - low
+                        forbiddenCves:
+                          type: array
+                          description: 'The "forbiddenCves" defines a list of CVEs that will cause the verification process to fail.'
+                          items:
+                            type: string
+                        ignoredCves:
+                          type: array
+                          description: 'The "ignoredCves" defines a list of CVEs that will be ignored during the verification process.'
+                          items:
+                            type: string
+                        blockUnscannedImages:
+                          description: 'The "blockUnscannedImages" determines whether to block unscanned container images.'
+                          type: boolean
+                          default: false
+                        excludedRegistries:
+                          description: 'The "excludedRegistries" defines a list of container registries by client definition that will be excluded from the vulnerability assessment.'
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              sourceType:
+                                description: 'The "sourceType" defines the type of registry item to be excluded could be "registry", "repository" or "image".'
+                                type: string
+                              value:
+                                description: 'The "value" defines the registry item value to be excluded, value could be registry, repository or image.'
+                                type: string
+                        unsupportedRegistries:
+                          description: 'The "unsupportedRegistries" defines a static list of container registries that are not supported for vulnerability assessment.'
+                          type: array
+                          items:
+                            type: string
+                    scope:
+                      description: 'The "scope" defines the conditions under which the rule applies. if not provided, scope is cluster wide'
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          matcherType:
+                            description: 'The "matcherType" defines the type of matcher used.'
+                            type: string
+                          anyOf:
+                            description: 'The "anyOf" defines a list of conditions.'
+                            type: array
+                            items:
+                              type: string
+                        required:
+                        - matcherType
+                        - anyOf
+                minItems: 0
+              policyLastEditTime:
+                description: 'The "policyLastEditTime" is the timestamp of when the policy was last edited.'
+                type: string
+                format: date-time
+            required:
+            - vulnerabilityAssessmentGatedDeployment
+  - name: v1alpha3
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        description: SecurityArtifactPolicy is the Schema for the defender.microsoft.com artifact based policies that are enforced by the Microsoft Defender for Cloud (MDC) admission controller.
+        type: object
+        properties:
+          spec:
+            type: object
+            description: Specification of the policy.
+            properties:
+              vulnerabilityAssessmentGatedDeployment:
+                description: 'The "vulnerabilityAssessmentGatedDeployment" defines the list of vulnerability assessment gated deployment rules.'
+                type: array
+                items:
+                  type: object
+                  required:
+                  - action
+                  - name
+                  properties:
+                    name:
+                      description: 'The "name" defines the name of the rule.'
+                      type: string
+                    action:
+                      description: 'The "action" can be set to either "audit" or "deny". Default action is audit.'
+                      type: string
+                      enum: ["audit", "deny"] # Add more actions if needed
+                    configuration:
+                      description: 'The "configuration" sets specific aspects of the verification process.'
+                      type: object
+                      properties:
+                        maximumVaFileAge:
+                          type: string
+                          description: 'The "maximumVaFileAge" defines the maximum age of the vulnerability assessment artifact. Files older than this value will not be considered for verification.'
+                        maxAllowedSeverities:
+                          type: object
+                          description: 'The "maxAllowedSeverities" defines the maximum allowed severity levels for CVEs.'
+                          properties:
+                            critical:
+                              type: integer
+                            high:
+                              type: integer
+                            medium:
+                              type: integer
+                            low:
+                              type: integer
+                          anyOf:
+                          - required:
+                            - critical
+                          - required:
+                            - high
+                          - required:
+                            - medium
+                          - required:
+                            - low
+                        forbiddenCves:
+                          type: array
+                          description: 'The "forbiddenCves" defines a list of CVEs that will cause the verification process to fail.'
+                          items:
+                            type: string
+                        ignoredCves:
+                          type: array
+                          description: 'The "ignoredCves" defines a list of CVEs that will be ignored during the verification process.'
+                          items:
+                            type: string
+                        blockUnscannedImages:
+                          description: 'The "blockUnscannedImages" determines whether to block unscanned container images.'
+                          type: boolean
+                          default: false
+                        exemptions:
+                          description: 'The "exemptions" defines a list of exemption definitions that will be excluded from the vulnerability assessment.'
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              type:
+                                description: 'The "type" defines the type of the exemption, could be "timeBased" or "permanent".'
+                                type: string
+                              value:
+                                description: 'The "value" defines the exemption value to be evaluated.'
+                                type: string
+                              timeBound:
+                                description: 'The "timeBound" defines the time duration for which the exemption is valid. This field is required if the exemption type is "timeBased".'
+                                type: object
+                                properties:
+                                  startDate:
+                                    description: 'The "startDate" defines the start date of the time-bound exemption.'
+                                    type: string
+                                    format: date-time
+                                  endDate:
+                                    description: 'The "endDate" defines the end date of the time-bound exemption.'
+                                    type: string
+                                    format: date-time
+                        unsupportedRegistries:
+                          description: 'The "unsupportedRegistries" defines a static list of container registries that are not supported for vulnerability assessment.'
+                          type: array
+                          items:
+                            type: string
+                    scope:
+                      description: 'The "scope" defines the conditions under which the rule applies. if not provided, scope is cluster wide'
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          matcherType:
+                            description: 'The "matcherType" defines the type of matcher used.'
+                            type: string
+                          anyOf:
+                            description: 'The "anyOf" defines a list of conditions.'
+                            type: array
+                            items:
+                              type: string
+                        required:
+                        - matcherType
+                        - anyOf
+                minItems: 0
+              policyLastEditTime:
+                description: 'The "policyLastEditTime" is the timestamp of when the policy was last edited.'
+                type: string
+                format: date-time
+            required:
+            - vulnerabilityAssessmentGatedDeployment
+  scope: Cluster
+  names:
+    shortNames:
+    - mdc-sap
+    kind: SecurityArtifactPolicy
+    listKind: SecurityArtifactPolicyList
+    plural: securityartifactpolicies
+    singular: securityartifactpolicy
+---
+# Source: microsoft-defender-for-containers/charts/microsoft-defender-for-containers-sensor/templates/crds/antimalware-crd.yml
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  labels:
+    kubernetes.azure.com/managedby: mdc
+  name: antimalwarepolicies.defender.microsoft.com
+spec:
+  group: defender.microsoft.com
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        description: AntimalwarePolicy is the Schema for the defender.microsoft.com security runtime, used by the Microsoft Defender for Cloud (MDC) Containers security agent.
+        type: object
+        properties:
+          spec:
+            type: object
+            description: Specification of the policy.
+            properties:
+              rules:
+                description: 'The list of antimalware scanning rules.'
+                type: array
+                minItems: 1
+                items:
+                  type: object
+                  properties:
+                    hostRule:
+                      type: object
+                      properties:
+                        name:
+                          description: 'The name of the rule.'
+                          type: string
+                        priority:
+                          description: 'The priority of the rule. A rule with a lower priority number will be evaluated first.'
+                          type: integer
+                        action:
+                          description: 'Indicates the desired action for events that match the rule.'
+                          type: string
+                          enum: ["None", "Alert", "Block"]
+                        excludedPaths:
+                          description: 'Defines a list of filesystem paths (wildcards allowed at start or end) to be excluded from the rule.'
+                          type: array
+                          items:
+                            type: string
+                      required:
+                        - name
+                        - priority
+                        - action
+                    workloadRule:
+                      type: object
+                      properties:
+                        name:
+                          description: 'The name of the rule.'
+                          type: string
+                        priority:
+                          description: 'The priority of the rule. A rule with a lower priority number will be evaluated first.'
+                          type: integer
+                        action:
+                          description: 'Indicates the desired action for events that match the rule.'
+                          type: string
+                          enum: ["None", "Alert", "Block"]
+                        excludeImageBinaries:
+                          description: 'Indicates whether scanning should occur for binaries that exist in the deployed image'
+                          default: false
+                          type: boolean
+                        excludedPaths:
+                          description: 'Defines a list of filesystem paths (wildcards allowed at start or end) to be excluded from the rule.'
+                          type: array
+                          items:
+                            type: string
+                        scope:
+                          description: 'Defines the conditions under which the rule applies.'
+                          type: array
+                          minItems: 1
+                          items:
+                            type: object
+                            properties:
+                              matcherType: 
+                                description: 'Defines the the property of the event that will be tested. Possible properties are "namespace", "containerName", "podName", "image", "podLabels"'
+                                type: string
+                              anyOf:
+                                description: 'Defines the list of patterns to test.'
+                                type: array
+                                items:
+                                  type: string
+                            required:
+                              - matcherType
+                              - anyOf 
+                      required:
+                        - name
+                        - priority
+                        - action
+                  oneOf:
+                    - required:
+                        - hostRule
+                    - required:
+                        - workloadRule
+              policyLastEditTime:
+                description: 'The timestamp of when the policy was last edited.'
+                type: string
+                format: date-time
+            required:
+              - rules
+  scope: Cluster
+  names:
+    shortNames:
+      - mdcamwp
+    kind: AntimalwarePolicy
+    listKind: AntimalwarePolicyList
+    plural: antimalwarepolicies
+    singular: antimalwarepolicy
+---
+# Source: microsoft-defender-for-containers/charts/microsoft-defender-for-containers-sensor/templates/crds/policy-crd.yml
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  labels:
+    kubernetes.azure.com/managedby: mdc
+  name: policies.defender.microsoft.com
+spec:
+  group: defender.microsoft.com
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        description: Policy is the Schema for the defender.microsoft.com API. This API is used by the Microsoft Defender for Cloud (MDC) Containers security agent.
+        type: object
+        properties:
+          spec:
+            type: object
+            description: Specification of the policy.
+            properties:
+              binaryDrift:
+                description: 'The "binaryDrift" defines the list of binary drift rules.'
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name:
+                      description: 'The "name" defines the name of the rule.'
+                      type: string
+                    priority:
+                      description: 'The "priority" defines the priority of the rule.'
+                      type: integer
+                    action:
+                      description: 'The "action" can be set to either "noAction" or other custom actions.'
+                      type: string
+                      enum: ["none", "alert", "block"]
+                    excludedProcesses:
+                      description: 'The "excludedProcesses" defines a list of processes to be excluded from the rule.'
+                      type: array
+                      items:
+                        type: string
+                    scope:
+                      description: 'The "scope" defines the conditions under which the rule applies.'
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          matcherType:
+                            description: 'The "matcherType" defines the type of matcher used.'
+                            type: string
+                          anyOf:
+                            description: 'The "anyOf" defines a list of conditions.'
+                            type: array
+                            items:
+                             type: string
+                minItems: 1
+                required:
+                  - action
+              policyLastEditTime:
+                description: 'The "policyLastEditTime" is the timestamp of when the policy was last edited.'
+                type: string
+                format: date-time
+            required:
+              - binaryDrift
+  scope: Cluster
+  names:
+    shortNames:
+      - mdcp
+    kind: Policy
+    listKind: PolicyList
+    plural: policies
+    singular: policy
+---
+# Source: microsoft-defender-for-containers/charts/microsoft-defender-for-containers-sensor/templates/crds/runtime-crd.yml
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  labels:
+    kubernetes.azure.com/managedby: mdc
+  name: runtimepolicies.defender.microsoft.com
+spec:
+  group: defender.microsoft.com
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        description: RuntimePolicy is the Schema for the defender.microsoft.com security runtime, used by the Microsoft Defender for Cloud (MDC) Containers security agent.
+        type: object
+        properties:
+          spec:
+            type: object
+            description: Specification of the policy.
+            properties:
+              binaryDrift:
+                description: 'The "binaryDrift" defines the list of binary drift rules.'
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name:
+                      description: 'The "name" defines the name of the rule.'
+                      type: string
+                    priority:
+                      description: 'The "priority" defines the priority of the rule.'
+                      type: integer
+                    action:
+                      description: 'The "action" can be set to either "noAction" or other custom actions.'
+                      type: string
+                      enum: ["none", "alert", "block"]
+                    excludedProcesses:
+                      description: 'The "excludedProcesses" defines a list of processes to be excluded from the rule.'
+                      type: array
+                      items:
+                        type: string
+                    scope:
+                      description: 'The "scope" defines the conditions under which the rule applies.'
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          matcherType:
+                            description: 'The "matcherType" defines the type of matcher used.'
+                            type: string
+                          anyOf:
+                            description: 'The "anyOf" defines a list of conditions.'
+                            type: array
+                            items:
+                             type: string
+                minItems: 1
+                required:
+                  - action
+              policyLastEditTime:
+                description: 'The "policyLastEditTime" is the timestamp of when the policy was last edited.'
+                type: string
+                format: date-time
+            required:
+              - binaryDrift
+  scope: Cluster
+  names:
+    shortNames:
+      - mdcrp
+    kind: RuntimePolicy
+    listKind: RuntimePolicyList
+    plural: runtimepolicies
+    singular: runtimepolicy
+---
+# Source: microsoft-defender-for-containers/charts/defender-admission-controller/templates/microsoftdefender-gating-admission-rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: "defender-admission-controller-cluster-role"
+  labels:
+    app.kubernetes.io/name: defender-admission-controller
+    app: defender-admission-cluster-controller
+    addonmanager.kubernetes.io/mode: Reconcile
+rules:
+
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get"]
+
+- apiGroups:
+  - admissionregistration.k8s.io
+  resources:
+  - validatingwebhookconfigurations
+  verbs: ["get", "list", "watch"]
+- apiGroups:
+  - admissionregistration.k8s.io
+  resources:
+  - validatingwebhookconfigurations
+  resourceNames: ["defender-admission-controller.mdc.svc"]
+  verbs: ["create", "update", "get", "list", "watch", "patch"]
+---
+# Source: microsoft-defender-for-containers/charts/defender-admission-controller/templates/microsoftdefender-gating-admission-rbac.yaml
+# Runtime Controller permissions for the Defender Admission Controller (registryaccessconfigurations, securityartifactpolicies)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: "defender-admission-controller-resource-cluster-role"
+  labels:
+    app: defender-admission-controller
+rules:
+- apiGroups: ["defender.microsoft.com"]
+  resources: ["securityartifactpolicies"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["defender.microsoft.com"]
+  resources: ["registryaccessconfigurations"]
+  verbs: ["get", "list", "watch"]
+---
+# Source: microsoft-defender-for-containers/charts/microsoft-defender-for-containers-sensor/templates/roles.yaml
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: mdc-pods-reader
+  labels:
+    app.kubernetes.io/name:  defender-k8s-sensor
+    app.kubernetes.io/version:  0.10.36
+    chart: microsoft-defender-for-containers-sensor-0.10.36
+    release: defender-k8s
+    heritage: Helm
+    app.kubernetes.io/managed-by: Helm
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["list", "get", "watch"]
+---
+# Source: microsoft-defender-for-containers/charts/microsoft-defender-for-containers-sensor/templates/roles.yaml
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: mdc-owner-objects-reader
+  labels:
+    app.kubernetes.io/name:  defender-k8s-sensor
+    app.kubernetes.io/version:  0.10.36
+    chart: microsoft-defender-for-containers-sensor-0.10.36
+    release: defender-k8s
+    heritage: Helm
+    app.kubernetes.io/managed-by: Helm
+rules:
+  - apiGroups: ["*"]
+    resources: ["daemonsets"]
+    verbs: ["list", "get", "watch"]
+  - apiGroups: ["*"]
+    resources: ["replicasets"]
+    verbs: ["list", "get", "watch"]
+  - apiGroups: ["*"]
+    resources: ["statefulsets"]
+    verbs: ["list", "get", "watch"]
+  - apiGroups: [ "*" ]
+    resources: [ "jobs" ]
+    verbs: [ "list", "get", "watch" ]
+  - apiGroups: [ "*" ]
+    resources: [ "cronjobs" ]
+    verbs: [ "list", "get", "watch" ]
+  - apiGroups: ["*"]
+    resources: ["deployments"]
+    verbs: ["list", "get", "watch"]
+---
+# Source: microsoft-defender-for-containers/charts/microsoft-defender-for-containers-sensor/templates/roles.yaml
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: mdc-nodes-reader
+  labels:
+    app.kubernetes.io/name:  defender-k8s-sensor
+    app.kubernetes.io/version:  0.10.36
+    chart: microsoft-defender-for-containers-sensor-0.10.36
+    release: defender-k8s
+    heritage: Helm
+    app.kubernetes.io/managed-by: Helm
+rules:
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["list", "get", "watch"]
+---
+# Source: microsoft-defender-for-containers/charts/microsoft-defender-for-containers-sensor/templates/roles.yaml
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: mdc-services-and-ingresses-reader
+  labels:
+    app.kubernetes.io/name:  defender-k8s-sensor
+    app.kubernetes.io/version:  0.10.36
+    chart: microsoft-defender-for-containers-sensor-0.10.36
+    release: defender-k8s
+    heritage: Helm
+    app.kubernetes.io/managed-by: Helm
+rules:
+- apiGroups: [""]
+  resources: ["services"]
+  verbs: ["list", "get", "watch"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["ingresses"]
+  verbs: ["get", "list", "watch"]
+---
+# Source: microsoft-defender-for-containers/charts/microsoft-defender-for-containers-sensor/templates/roles.yaml
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: mdc-policy-operator
+  labels:
+    app.kubernetes.io/name:  defender-k8s-sensor
+    app.kubernetes.io/version:  0.10.36
+    chart: microsoft-defender-for-containers-sensor-0.10.36
+    release: defender-k8s
+rules:
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    verbs: ["get", "list", "watch", "create", "update", "delete"]
+  - apiGroups: ["defender.microsoft.com"]  
+    resources: ["*"]
+    verbs: ["get", "list", "watch", "create", "update", "delete"]
+---
+# Source: microsoft-defender-for-containers/charts/defender-admission-controller/templates/microsoftdefender-gating-admission-rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: defender-admission-controller-cluster-role-binding
+  labels:
+    app: defender-admission-controller
+    addonmanager.kubernetes.io/mode: Reconcile
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: defender-admission-controller-cluster-role
+subjects:
+- kind: ServiceAccount
+  name: defender-admission-controller-serviceaccount
+  namespace: mdc
+---
+# Source: microsoft-defender-for-containers/charts/defender-admission-controller/templates/microsoftdefender-gating-admission-rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: defender-admission-controller-cluster-resource-role-binding
+  labels:
+    app: defender-admission-controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: defender-admission-controller-resource-cluster-role
+subjects:
+- kind: ServiceAccount
+  name: defender-admission-controller-serviceaccount
+  namespace: mdc
+---
+# Source: microsoft-defender-for-containers/charts/microsoft-defender-for-containers-sensor/templates/role-bindings.yaml
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: mdc-pods-reader-collectors-sa-rolebinding
+  labels:
+    app.kubernetes.io/name:  defender-k8s-sensor
+    app.kubernetes.io/version:  0.10.36
+    addonmanager.kubernetes.io/mode: Reconcile
+subjects:
+  - kind: ServiceAccount
+    name: microsoft-defender-collectors-sa
+    namespace: mdc
+roleRef:
+  name: mdc-pods-reader
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+---
+# Source: microsoft-defender-for-containers/charts/microsoft-defender-for-containers-sensor/templates/role-bindings.yaml
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: mdc-owner-objects-reader-collectors-sa-rolebinding
+  labels:
+    app.kubernetes.io/name:  defender-k8s-sensor
+    app.kubernetes.io/version:  0.10.36
+    addonmanager.kubernetes.io/mode: Reconcile
+subjects:
+  - kind: ServiceAccount
+    name: microsoft-defender-collectors-sa
+    namespace: mdc
+roleRef:
+  name: mdc-owner-objects-reader
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+---
+# Source: microsoft-defender-for-containers/charts/microsoft-defender-for-containers-sensor/templates/role-bindings.yaml
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: mdc-pods-reader-publisher-sa-rolebinding
+  labels:
+    app.kubernetes.io/name:  defender-k8s-sensor
+    app.kubernetes.io/version:  0.10.36
+    addonmanager.kubernetes.io/mode: Reconcile
+subjects:
+  - kind: ServiceAccount
+    name: microsoft-defender-publisher-sa
+    namespace: mdc
+roleRef:
+  name: mdc-pods-reader
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+---
+# Source: microsoft-defender-for-containers/charts/microsoft-defender-for-containers-sensor/templates/role-bindings.yaml
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: mdc-policy-operator-collector-sa-rolebinding
+  labels:
+    app.kubernetes.io/name:  defender-k8s-sensor
+    app.kubernetes.io/version:  0.10.36
+    addonmanager.kubernetes.io/mode: Reconcile
+subjects:
+  - kind: ServiceAccount
+    name: microsoft-defender-collectors-sa
+    namespace: mdc
+roleRef:
+  name: mdc-policy-operator
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+---
+# Source: microsoft-defender-for-containers/charts/microsoft-defender-for-containers-sensor/templates/role-bindings.yaml
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: mdc-nodes-reader-rolebinding
+  labels:
+    app.kubernetes.io/name:  defender-k8s-sensor
+    app.kubernetes.io/version:  0.10.36
+    addonmanager.kubernetes.io/mode: Reconcile
+subjects:
+  - kind: ServiceAccount
+    name: microsoft-defender-collectors-sa
+    namespace: mdc
+  - kind: ServiceAccount
+    name: microsoft-defender-publisher-sa
+    namespace: mdc
+roleRef:
+  name: mdc-nodes-reader
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+---
+# Source: microsoft-defender-for-containers/charts/microsoft-defender-for-containers-sensor/templates/role-bindings.yaml
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: mdc-services-and-ingresses-reader-rolebinding
+  labels:
+    app.kubernetes.io/name:  defender-k8s-sensor
+    app.kubernetes.io/version:  0.10.36
+    addonmanager.kubernetes.io/mode: Reconcile
+subjects:
+  - kind: ServiceAccount
+    name: microsoft-defender-collectors-sa
+    namespace: mdc
+roleRef:
+  name: mdc-services-and-ingresses-reader
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+---
+# Source: microsoft-defender-for-containers/charts/defender-admission-controller/templates/microsoftdefender-gating-admission-rbac.yaml
+# Server certifiacte auto generation permissions
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: "defender-admission-controller-role"
+  namespace: mdc
+  labels:
+    app.kubernetes.io/name: defender-admission-controller
+    app: defender-admission-controller
+    addonmanager.kubernetes.io/mode: Reconcile
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["list", "watch", "get"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["list", "watch", "get", "update", "create"]
+  resourceNames: ["defender-admission-controller-server-cert"]
+---
+# Source: microsoft-defender-for-containers/charts/microsoft-defender-for-containers-sensor/templates/roles.yaml
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: mdc-event-reader
+  namespace: mdc
+  labels:
+    app.kubernetes.io/name:  defender-k8s-sensor
+    app.kubernetes.io/version:  0.10.36
+    chart: microsoft-defender-for-containers-sensor-0.10.36
+    release: defender-k8s
+    heritage: Helm
+    app.kubernetes.io/managed-by: Helm
+rules:
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["list", "get", "watch"]
+---
+# Source: microsoft-defender-for-containers/charts/microsoft-defender-for-containers-sensor/templates/roles.yaml
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: mdc-configmap-master
+  namespace: mdc
+  labels:
+    app.kubernetes.io/name:  defender-k8s-sensor
+    app.kubernetes.io/version:  0.10.36
+    chart: microsoft-defender-for-containers-sensor-0.10.36
+    release: defender-k8s
+    heritage: Helm
+    app.kubernetes.io/managed-by: Helm
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["list", "get", "patch"]
+---
+# Source: microsoft-defender-for-containers/charts/defender-admission-controller/templates/microsoftdefender-gating-admission-rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: defender-admission-controller-role-binding
+  namespace: mdc
+  labels:
+    app: defender-admission-controller
+    addonmanager.kubernetes.io/mode: Reconcile
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: defender-admission-controller-role
+subjects:
+- kind: ServiceAccount
+  name: defender-admission-controller-serviceaccount
+  namespace: mdc
+---
+# Source: microsoft-defender-for-containers/charts/microsoft-defender-for-containers-sensor/templates/role-bindings.yaml
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: mdc-configmap-master-rolebinding
+  namespace:  mdc
+  labels:
+    app.kubernetes.io/name:  defender-k8s-sensor
+    app.kubernetes.io/version:  0.10.36
+    chart: microsoft-defender-for-containers-sensor-0.10.36
+    release: defender-k8s
+    heritage: Helm
+    app.kubernetes.io/managed-by: Helm
+    addonmanager.kubernetes.io/mode: Reconcile
+subjects:
+  - kind: ServiceAccount
+    name: microsoft-defender-publisher-sa
+    namespace: mdc
+roleRef:
+  kind: Role
+  name: mdc-configmap-master
+  apiGroup: rbac.authorization.k8s.io
+---
+# Source: microsoft-defender-for-containers/charts/microsoft-defender-for-containers-sensor/templates/role-bindings.yaml
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: mdc-event-reader-rolebinding
+  namespace: mdc
+  labels:
+    app.kubernetes.io/name:  defender-k8s-sensor
+    app.kubernetes.io/version:  0.10.36
+    addonmanager.kubernetes.io/mode: Reconcile
+subjects:
+  - kind: ServiceAccount
+    name: microsoft-defender-publisher-sa
+    namespace: mdc
+roleRef:
+  name: mdc-event-reader
+  kind: Role
+  apiGroup: rbac.authorization.k8s.io
+---
+# Source: microsoft-defender-for-containers/charts/defender-admission-controller/templates/microsoftdefender-gating-admission-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: defender-admission-controller
+spec:
+  selector:
+    app.kubernetes.io/name: defender-admission-controller
+  ports:
+    - port: 443
+      targetPort: 8443
+---
+# Source: microsoft-defender-for-containers/charts/microsoft-defender-for-containers-sensor/templates/daemonset-collectors.yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+ name: microsoft-defender-collectors-ds
+ namespace: mdc
+ labels:
+   app.kubernetes.io/name:  defender-k8s-sensor
+   app.kubernetes.io/version:  0.10.36
+   addonmanager.kubernetes.io/mode: Reconcile
+   kubernetes.azure.com/managedby: aks
+   tier: node
+spec:
+ updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 1
+ selector:
+   matchLabels:
+     dsName: microsoft-defender-collectors-ds
+ template:
+  metadata:
+   labels:
+    app.kubernetes.io/name:  defender-k8s-sensor
+    app.kubernetes.io/version:  0.10.36
+    dsName: "microsoft-defender-collectors-ds"
+    app: defender-k8s-sensor
+    kubernetes.azure.com/managedby: aks
+   annotations:
+    schema-versions: "v1"
+  spec:
+   hostNetwork: true
+   hostPID: true
+   serviceAccountName: microsoft-defender-collectors-sa
+   
+   containers:
+
+   - name: microsoft-defender-low-level-collectors
+     image: "mcr.microsoft.com/azuredefender/stable/low-level-collector:2.2.18"
+     imagePullPolicy: IfNotPresent
+     
+     securityContext:
+       # AppArmor Unconfined: required for eBPF syscalls that default profiles block.
+       appArmorProfile:
+         type: Unconfined
+       # Drop all capabilities, then add back only what eBPF-based collectors need.
+       capabilities:
+         drop:
+           - all
+         add:
+           - SYS_ADMIN # eBPF program loading, cgroup/mount namespace ops
+           - SYS_RESOURCE # Raise RLIMIT_MEMLOCK for eBPF ring buffers
+           - SYS_PTRACE # Cross-namespace /proc access for process monitoring
+           - SYSLOG # Read kernel log ring buffer
+           - IPC_LOCK # mlock() to pin eBPF map memory
+           - NET_ADMIN # Attach eBPF to network interfaces for DNS capture
+           - NET_RAW # Raw socket access for DNS packet inspection   
+     resources:
+     
+       limits:
+         cpu: 330m
+         memory: 280Mi
+       requests:
+         cpu: 150m
+         memory: 128Mi
+     env:
+     - name: INFRASTRUCTURE
+       value: "azure"    
+     - name: MIN_LOGGER_LEVEL
+       value: "debug"
+     - name: LLC_EVENT_SENDER_SOCKET_NAME
+       value: /tmp/mdc-ipc/antimalware.sock
+     - name: HOST_ROOT
+       value: /host
+     - name: AZURE_RESOURCE_ID
+       value: "/subscriptions/e406a385-feed-47ce-9194-13ed4f88f094/resourceGroups/rg-dsolab-sea/providers/Microsoft.ContainerService/managedClusters/aks-dsolab-sea"
+     - name: AZURE_RESOURCE_REGION
+       value: "southeastasia"
+     - name: CLUSTER_DISTRIBUTION
+       value: "aks"
+     - name: CHART_VERSION
+       value: "0.10.36"
+     - name: IMAGE_VERSION
+       value: "mcr.microsoft.com/azuredefender/stable/low-level-collector:2.2.18"
+     - name: NODE_NAME
+       valueFrom:
+         fieldRef:
+           fieldPath: spec.nodeName
+     - name: ANTIMALWARE_COLLECTOR_ENABLED
+       value: "true"
+     - name: EXEC_COLLECTOR_ENABLED
+       value: "true"
+     - name: DNS_COLLECTOR_ENABLED
+       value: "true"
+     - name: FIM_COLLECTOR_ENABLED
+       value: "true"
+     volumeMounts:
+       # Mount host root fs used by FIM for file monitoring and IG.
+       - mountPath: /host
+         name: host-root
+         readOnly: true
+       # Used by Exec collector for IPC communication with antimalware container
+       - mountPath: /tmp/mdc-ipc
+         name: mdc-ipc
+       # Used by Exec collector to persist events
+       - mountPath: /var/log/microsoft-defender-for-cloud/collectors/LowLevelCollector
+         name: mdc-low-level-collectors-log
+       # Used by Fim collector to persist events
+       - mountPath: /var/log/microsoft-defender-for-cloud/collectors/FimCollector
+         name: mdc-fim-collectors-log
+       # Used by Dns collector to persist events
+       - mountPath: /var/log/microsoft-defender-for-cloud/collectors/DnsCollector
+         name: mdc-dns-collectors-log
+       # Used by IG for CRI
+       - mountPath: /run
+         name: run
+       # Used by instrumentation lib to persis metrics
+       - mountPath: /var/log/microsoft-defender-for-cloud/metrics
+         name: mdc-metrics-log
+       # Used by instrumentation lib to persist traces
+       - mountPath: /var/log/microsoft-defender-for-cloud/traces
+         name: mdc-traces-log
+       # Used by IG for kernel tracing
+       - mountPath: /sys/kernel
+         name: debugfs
+       # Used by IG for bpf
+       - mountPath: /sys/fs/bpf
+         name: bpffs
+       - name: ca-certs
+         mountPath: /etc/ssl/certs
+         readOnly: true
+       - name: etc-pki-ca-certs
+         mountPath: /etc/pki/ca-trust/extracted
+         readOnly: true
+
+   - name: microsoft-defender-pod-collector
+     image: "mcr.microsoft.com/azuredefender/stable/pod-collector:1.0.248"
+     imagePullPolicy: IfNotPresent
+     
+     
+     securityContext:
+       capabilities:
+         drop:
+           - all
+         add:
+           - NET_RAW
+           - NET_ADMIN
+     resources:
+     
+       limits:
+         cpu: 60m
+         memory: 200Mi
+       requests:
+         cpu: 30m
+         memory: 32Mi
+     env:
+     - name: MIN_LOGGER_LEVEL
+       value: "debug" 
+     - name: WATCH_WINDOWS_NODES
+       value: "false"
+     - name: NODE_RESYNC_DURATION
+       value: "1h"
+     - name: NODE_NAME
+       valueFrom:
+         fieldRef:
+           fieldPath: spec.nodeName
+     - name: INFRASTRUCTURE
+       value: "azure"      
+     - name: COMPONENT_NAME
+       value: "PodCollector"
+     - name: CLUSTER_DISTRIBUTION
+       value: "aks"
+     - name: AZURE_RESOURCE_REGION
+       value: "southeastasia"
+     - name: AZURE_RESOURCE_ID
+       value: "/subscriptions/e406a385-feed-47ce-9194-13ed4f88f094/resourceGroups/rg-dsolab-sea/providers/Microsoft.ContainerService/managedClusters/aks-dsolab-sea"
+     - name: IMAGE_VERSION
+       value: "mcr.microsoft.com/azuredefender/stable/pod-collector:1.0.248"
+     - name: RESYNC_DURATION
+       value: "1h"
+     - name: CHART_VERSION
+       value: "0.10.36"
+     volumeMounts:
+       - mountPath: /var/log/microsoft-defender-for-cloud/collectors/PodCollector
+         name: mdc-podcollectors-log
+       - mountPath: /var/log/microsoft-defender-for-cloud/metrics
+         name: mdc-metrics-log
+       - mountPath: /var/log/microsoft-defender-for-cloud/traces
+         name: mdc-traces-log
+       - name: ca-certs
+         mountPath: /etc/ssl/certs
+         readOnly: true
+       - name: etc-pki-ca-certs
+         mountPath: /etc/pki/ca-trust/extracted
+         readOnly: true
+
+   - name: microsoft-defender-antimalware-collector
+     image: "mcr.microsoft.com/azuredefender/stable/anti-malware-collector:1.0.16"
+     imagePullPolicy: IfNotPresent
+     
+     
+     securityContext:
+       privileged: true
+       capabilities:
+         drop:
+           - all
+         add: 
+           - SYS_PTRACE
+     resources:
+     
+         limits:
+           cpu: 300m
+           memory: 500Mi
+         requests:
+           cpu: 50m
+           memory: 350Mi
+     env:
+     - name: MIN_LOGGER_LEVEL
+       value: "debug" 
+     - name: LLC_EVENT_SENDER_SOCKET_NAME
+       value: /tmp/mdc-ipc/antimalware.sock
+     - name: HOST_ROOT
+       value: /host
+     - name: AZURE_RESOURCE_ID
+       value: "/subscriptions/e406a385-feed-47ce-9194-13ed4f88f094/resourceGroups/rg-dsolab-sea/providers/Microsoft.ContainerService/managedClusters/aks-dsolab-sea"
+     - name: AZURE_RESOURCE_REGION
+       value: "southeastasia"
+     - name: CLUSTER_DISTRIBUTION
+       value: "aks"
+     - name: CHART_VERSION
+       value: "0.10.36"
+     - name: IMAGE_VERSION
+       value: "mcr.microsoft.com/azuredefender/stable/anti-malware-collector:1.0.16"
+     - name: NODE_NAME
+       valueFrom:
+         fieldRef:
+           fieldPath: spec.nodeName
+     volumeMounts:
+       - mountPath: /tmp/mdc-ipc
+         name: mdc-ipc
+       - mountPath: /var/log/microsoft-defender-for-cloud/metrics
+         name: mdc-metrics-log
+       - mountPath: /var/log/microsoft-defender-for-cloud/traces
+         name: mdc-traces-log
+       - mountPath: /var/log/microsoft-defender-for-cloud/collectors/AntimalwareCollector
+         name: mdc-amw-collectors-log
+       - mountPath: /host
+         name: host-root
+         readOnly: true
+   affinity:
+    nodeAffinity:
+     requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/os
+          operator: In
+          values:
+          - linux
+        - key: type
+          operator: NotIn
+          values:
+          - virtual-kubelet
+        - key: kubernetes.azure.com/cluster
+          operator: Exists
+   tolerations:
+    - key: "CriticalAddonsOnly"
+      operator: "Exists"
+    - operator: "Exists"
+      effect: "NoSchedule"
+    - operator: "Exists"
+      effect: "NoExecute"
+    - operator: "Exists"
+      effect: "PreferNoSchedule"
+# all the collector's volumes
+   volumes:
+   - name: host-root
+     hostPath: 
+       path: /
+   - name: mdc-ipc
+     emptyDir:
+       medium: Memory
+       sizeLimit: 16Mi
+   - name: mdc-podcollectors-log
+     hostPath:
+       path: /var/log/microsoft-defender-for-cloud/collectors/PodCollector
+   - name: mdc-dns-collectors-log
+     hostPath:
+       path: /var/log/microsoft-defender-for-cloud/collectors/DnsCollector
+   - name: mdc-amw-collectors-log
+     hostPath:
+       path: /var/log/microsoft-defender-for-cloud/collectors/AntimalwareCollector
+   - name: mdc-fim-collectors-log
+     hostPath:
+       path: /var/log/microsoft-defender-for-cloud/collectors/FimCollector
+   - name: mdc-low-level-collectors-log
+     hostPath:
+       path: /var/log/microsoft-defender-for-cloud/collectors/LowLevelCollector
+   - name: mdc-metrics-log
+     hostPath:
+       path: /var/log/microsoft-defender-for-cloud/metrics
+   - name: mdc-traces-log
+     hostPath:
+       path: /var/log/microsoft-defender-for-cloud/traces
+   - name: run
+     hostPath:
+       path: /run
+   - name: bpffs
+     hostPath:
+       path: /sys/fs/bpf
+   - name: debugfs
+     hostPath:
+       path: /sys/kernel
+   - name: ca-certs
+     hostPath:
+       path: /etc/ssl/certs
+       type: Directory
+   - name: etc-pki-ca-certs
+     hostPath:
+       path: /etc/pki/ca-trust/extracted
+       type: DirectoryOrCreate
+---
+# Source: microsoft-defender-for-containers/charts/microsoft-defender-for-containers-sensor/templates/daemonset-publisher.yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+ name: microsoft-defender-publisher-ds
+ namespace: mdc
+ labels:
+   app.kubernetes.io/name:  defender-k8s-sensor
+   app.kubernetes.io/version:  0.10.36
+   chart: microsoft-defender-for-containers-sensor-0.10.36
+   release: defender-k8s
+   heritage: Helm
+   app.kubernetes.io/managed-by: Helm
+   component: microsoft-defender-for-cloud
+   tier: node
+   app: defender-k8s-sensor
+   addonmanager.kubernetes.io/mode: Reconcile
+   kubernetes.azure.com/managedby: aks
+spec:
+ updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 1
+ selector:
+   matchLabels:
+     dsName: "microsoft-defender-publisher-ds"
+ template:
+  metadata:
+   labels:
+    app.kubernetes.io/name:  defender-k8s-sensor
+    app.kubernetes.io/version:  0.10.36
+    dsName: "microsoft-defender-publisher-ds"
+    app: defender-k8s-sensor
+    kubernetes.azure.com/managedby: aks
+  spec:
+   hostNetwork: true
+   serviceAccountName: microsoft-defender-publisher-sa
+
+   initContainers:
+  
+   - name: old-file-cleaner
+     image: "mcr.microsoft.com/azuredefender/stable/old-file-cleaner:1.1.59"
+     imagePullPolicy: IfNotPresent
+     
+     securityContext:
+       capabilities:
+         drop:
+           - all
+     env:
+     - name: MIN_LOGGER_LEVEL
+       value: "debug" 
+     - name: FBIT_KUBE_AUDIT_PATH
+       value: /var/log
+     - name: AZURE_RESOURCE_ID
+       value: "/subscriptions/e406a385-feed-47ce-9194-13ed4f88f094/resourceGroups/rg-dsolab-sea/providers/Microsoft.ContainerService/managedClusters/aks-dsolab-sea"
+     - name: AZURE_RESOURCE_REGION
+       value: "southeastasia"
+     - name: CLUSTER_DISTRIBUTION
+       value: "aks"
+     - name: CHART_VERSION
+       value: "0.10.36"
+     - name: IMAGE_VERSION
+       value: "mcr.microsoft.com/azuredefender/stable/old-file-cleaner:1.1.59"
+     - name: NODE_NAME
+       valueFrom:
+         fieldRef:
+           fieldPath: spec.nodeName
+     volumeMounts:
+     - mountPath: /etc/kubernetes/host
+       name: azure-json-path
+     - mountPath: /mnt/fluent-bit
+       name: fluent-bit-conf
+     - mountPath: /var/log/microsoft-defender-for-cloud
+       name: mdc-log
+   containers:
+  
+   - name: microsoft-defender-publisher
+     image: "mcr.microsoft.com/azuredefender/stable/security-publisher:1.1.63"
+     imagePullPolicy: IfNotPresent
+     
+     resources:
+     
+       limits:
+         cpu: 60m
+         memory: 200Mi
+       requests:
+         cpu: 30m
+         memory: 32Mi
+     env:
+       - name: INFRASTRUCTURE
+         value: "azure"
+       - name: MIN_LOGGER_LEVEL
+         value: "debug"
+       - name: NAMESPACE
+         value: mdc
+       - name: AZURE_RESOURCE_ID
+         value: "/subscriptions/e406a385-feed-47ce-9194-13ed4f88f094/resourceGroups/rg-dsolab-sea/providers/Microsoft.ContainerService/managedClusters/aks-dsolab-sea"
+       - name: NATIVE_CLOUD_IDENTIFIER
+         value: "/subscriptions/e406a385-feed-47ce-9194-13ed4f88f094/resourceGroups/rg-dsolab-sea/providers/Microsoft.ContainerService/managedClusters/aks-dsolab-sea"
+       - name: AZURE_RESOURCE_REGION
+         value: "southeastasia"
+       - name: CLUSTER_DISTRIBUTION
+         value: "aks"
+       - name: CHART_VERSION
+         value: "0.10.36"
+       - name: IMAGE_VERSION
+         value: "mcr.microsoft.com/azuredefender/stable/security-publisher:1.1.63"
+       - name: MDC_ENDPOINT
+         value: https://api.cloud.defender.microsoft.com
+       - name: NODE_NAME
+         valueFrom:
+           fieldRef:
+             fieldPath: spec.nodeName
+       - name: FBIT_ENABLE_KUBE_AUDIT
+         value: "false"
+       - name: CONTROLLER_TYPE
+         value: "DaemonSet"
+     volumeMounts:
+       - mountPath: /var/run/secrets/tokens
+         name: psat-token
+       - mountPath: /var/microsoft/microsoft-defender-for-cloud
+         name: cert-onboarding
+       - mountPath: /mnt/fluent-bit
+         name: fluent-bit-conf
+       - mountPath: /var/log/microsoft-defender-for-cloud
+         name: mdc-log
+       - mountPath: /var/log/kube-apiserver
+         name: kube-audit
+       - mountPath: /etc/kubernetes/host
+         name: azure-json-path
+       - mountPath: /etc/omsagent-secret
+         name: omsagent-secret
+         readOnly: true
+     
+       - name: ca-certs
+         mountPath: /etc/ssl/certs
+         readOnly: true
+       - name: etc-pki-ca-certs
+         mountPath: /etc/pki/ca-trust/extracted
+         readOnly: true
+   affinity:
+    nodeAffinity:
+     requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/os
+          operator: In
+          values:
+          - linux
+        - key: type
+          operator: NotIn
+          values:
+          - virtual-kubelet
+        - key: kubernetes.azure.com/cluster
+          operator: Exists
+   tolerations:
+    - key: "CriticalAddonsOnly"
+      operator: "Exists"
+    - operator: "Exists"
+      effect: "NoSchedule"
+    - operator: "Exists"
+      effect: "NoExecute"
+    - operator: "Exists"
+      effect: "PreferNoSchedule"
+   volumes:
+    - name: psat-token
+      projected:
+        sources:
+        - serviceAccountToken:
+            path: token
+            audience: api.cloud.defender.microsoft.com
+    - name: cert-onboarding
+      hostPath: 
+       path: /var/microsoft/microsoft-defender-for-cloud
+    - name: mdc-log
+      hostPath:
+       path: /var/log/microsoft-defender-for-cloud
+    - name: kube-audit
+      hostPath:
+       path: /var/log/kube-apiserver
+    - name: azure-json-path
+      hostPath:
+       path: /etc/kubernetes
+    - name: omsagent-secret
+      secret:
+       secretName: omsagent-secret
+    - name: fluent-bit-conf
+      emptyDir: {}
+    - name: ca-certs
+      hostPath:
+        path: /etc/ssl/certs
+        type: Directory
+    - name: etc-pki-ca-certs
+      hostPath:
+        path: /etc/pki/ca-trust/extracted
+        type: DirectoryOrCreate
+---
+# Source: microsoft-defender-for-containers/charts/defender-admission-controller/templates/microsoftdefender-gating-admission-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: defender-admission-controller
+  labels:
+    app.kubernetes.io/name: defender-admission-controller
+    app: defender-admission-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: defender-admission-controller
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: defender-admission-controller
+        app: defender-admission-controller
+        azure.workload.identity/use: "true"
+    spec:
+      serviceAccountName: "defender-admission-controller-serviceaccount"
+      
+      hostNetwork: true
+      
+      tolerations:
+        
+        - key: "CriticalAddonsOnly"
+          operator: "Exists"
+        
+        - key: "kubernetes.io/arch"
+          operator: "Equal"
+          value: "arm64"
+          effect: "NoSchedule"
+      
+      containers:
+      - name: defender-admission-controller        
+        image: mcr.microsoft.com/mdc/prd/defender-admission-controller:1.0.168
+        ports:
+        - containerPort: 8443
+        volumeMounts:
+        - name: admission-tls
+          mountPath: /etc/certs
+          readOnly: true
+        
+        - mountPath: /var/log/microsoft-defender-for-cloud/traces
+          name: mdc-traces-log
+        - mountPath: /var/log/microsoft-defender-for-cloud/metrics
+          name: mdc-metrics-log
+        - mountPath: /var/log/microsoft-defender-for-cloud/collectors/GatingCollector
+          name: mdc-podcollectors-log       
+        command:
+          - "/usr/bin/app"
+        args:
+          - "--certificate-path"
+          - "/etc/certs"
+          - "--service-name"
+          - "defender-admission-controller"
+          - "--secret-name"
+          - "defender-admission-controller-server-cert"
+          - "--require-signed-artifacts=true"
+          - "--enable-priority=true"
+          - '--cloud-provider=azure'
+          
+          
+          - "--use-pull-secrets"
+          
+          
+          
+          
+        env:
+        
+        - name: AZURE_RESOURCE_ID
+          value: "/subscriptions/e406a385-feed-47ce-9194-13ed4f88f094/resourceGroups/rg-dsolab-sea/providers/Microsoft.ContainerService/managedClusters/aks-dsolab-sea"
+        - name: AZURE_RESOURCE_REGION
+          value: "southeastasia"
+        - name: POD_NAMESPACE
+          value: mdc
+        - name: RATIFY_NAMESPACE
+          value: mdc
+        - name: IMAGE_VERSION
+          value: "1.0.168"
+        - name: CHART_VERSION
+          value: "0.12.30"
+        - name: MDM_ACCOUNT
+          value: "RomeDetection"
+        resources:
+          limits:
+            cpu: 600m
+            memory: 512Mi
+          requests:
+            cpu: 200m
+            memory: 256Mi
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/os
+                operator: In
+                values:
+                - linux
+              - key: type
+                operator: NotIn
+                values:
+                - virtual-kubelet
+      volumes:
+      
+      - name: admission-tls
+        secret:
+          secretName: defender-admission-controller-server-cert
+      - name: mdc-metrics-log
+        hostPath:
+          path: /var/log/microsoft-defender-for-cloud/metrics
+      - name: mdc-traces-log
+        hostPath:
+          path: /var/log/microsoft-defender-for-cloud/traces
+      - name: mdc-podcollectors-log
+        hostPath:
+          path: /var/log/microsoft-defender-for-cloud/collectors/GatingCollector
+---
+# Source: microsoft-defender-for-containers/charts/microsoft-defender-for-containers-sensor/templates/deployments-collectors.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+ name: microsoft-defender-pod-collector-virtual-kubelet
+ namespace: mdc
+ labels:
+   app.kubernetes.io/name:  defender-k8s-sensor
+   app.kubernetes.io/version:  0.10.36
+   addonmanager.kubernetes.io/mode: Reconcile
+   kubernetes.azure.com/managedby: aks
+   tier: node
+spec:
+ replicas: 1
+ selector:
+   matchLabels:
+     deploymentName: microsoft-defender-pod-collector-virtual-kubelet
+ template:
+  metadata:
+   labels:
+    app.kubernetes.io/name:  defender-k8s-sensor
+    app.kubernetes.io/version:  0.10.36
+    deploymentName: microsoft-defender-pod-collector-virtual-kubelet
+    app: defender-k8s-sensor
+    kubernetes.azure.com/managedby: aks
+   annotations:
+    cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
+  spec:
+   serviceAccountName: microsoft-defender-collectors-sa
+
+   containers:
+  
+    - name: microsoft-defender-pod-collector
+      image: "mcr.microsoft.com/azuredefender/stable/pod-collector:1.0.248"
+      imagePullPolicy: IfNotPresent
+      
+      
+      securityContext:
+        capabilities:
+          drop:
+            - all
+          add:
+            - NET_RAW
+            - NET_ADMIN
+      resources:
+      
+        limits:
+          cpu: 60m
+          memory: 200Mi
+        requests:
+          cpu: 30m
+          memory: 32Mi
+      env:
+      - name: MIN_LOGGER_LEVEL
+        value: "debug" 
+      - name: WATCH_WINDOWS_NODES
+        value: "false"
+      - name: NODE_RESYNC_DURATION
+        value: "1h"
+      - name: NODE_NAME
+        value: "virtual-kubelet"
+      - name: INFRASTRUCTURE
+        value: "azure"      
+      - name: COMPONENT_NAME
+        value: "PodCollectorVirtualKubelet"
+      - name: CLUSTER_DISTRIBUTION
+        value: "aks"
+      - name: AZURE_RESOURCE_REGION
+        value: "southeastasia"
+      - name: AZURE_RESOURCE_ID
+        value: "/subscriptions/e406a385-feed-47ce-9194-13ed4f88f094/resourceGroups/rg-dsolab-sea/providers/Microsoft.ContainerService/managedClusters/aks-dsolab-sea"
+      - name: IMAGE_VERSION
+        value: "mcr.microsoft.com/azuredefender/stable/pod-collector:1.0.248"
+      - name: RESYNC_DURATION
+        value: "1h"
+      - name: CHART_VERSION
+        value: "0.10.36"
+      volumeMounts:
+        - mountPath: /var/log/microsoft-defender-for-cloud/collectors/PodCollectorVirtualKubelet
+          name: mdc-podcollectorvirtualkubelets-log
+        - mountPath: /var/log/microsoft-defender-for-cloud/metrics
+          name: mdc-metrics-log
+        - mountPath: /var/log/microsoft-defender-for-cloud/traces
+          name: mdc-traces-log
+        - name: ca-certs
+          mountPath: /etc/ssl/certs
+          readOnly: true
+        - name: etc-pki-ca-certs
+          mountPath: /etc/pki/ca-trust/extracted
+          readOnly: true
+   tolerations:
+    - key: "CriticalAddonsOnly"
+      operator: "Exists"
+   affinity:
+    nodeAffinity:
+     requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.azure.com/cluster
+          operator: Exists
+        - key: type
+          operator: NotIn
+          values:
+          - virtual-kubelet
+        - key: kubernetes.io/os
+          operator: In
+          values:
+          - linux
+   volumes:
+       - name:  mdc-podcollectorvirtualkubelets-log
+         hostPath:
+           path: /var/log/microsoft-defender-for-cloud/collectors/PodCollectorVirtualKubelet
+       - name: mdc-metrics-log
+         hostPath:
+           path: /var/log/microsoft-defender-for-cloud/metrics
+       - name: mdc-traces-log
+         hostPath:
+           path: /var/log/microsoft-defender-for-cloud/traces
+       - name: ca-certs
+         hostPath:
+           path: /etc/ssl/certs
+           type: Directory
+       - name: etc-pki-ca-certs
+         hostPath:
+           path: /etc/pki/ca-trust/extracted
+           type: DirectoryOrCreate
+---
+# Source: microsoft-defender-for-containers/charts/microsoft-defender-for-containers-sensor/templates/deployments-collectors.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: microsoft-defender-pod-collector-misc
+  namespace: mdc
+  labels:
+    app.kubernetes.io/name:  defender-k8s-sensor
+    app.kubernetes.io/version:  0.10.36
+    kubernetes.azure.com/managedby: aks
+    addonmanager.kubernetes.io/mode: Reconcile
+    tier: node
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      deploymentName: microsoft-defender-pod-collector-misc
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name:  defender-k8s-sensor
+        app.kubernetes.io/version:  0.10.36
+        deploymentName: microsoft-defender-pod-collector-misc
+        app: defender-k8s-sensor
+        kubernetes.azure.com/managedby: aks
+      annotations:
+        cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
+    spec:
+      serviceAccountName: microsoft-defender-collectors-sa
+
+      containers:
+      
+        - name: microsoft-defender-pod-collector
+          image: "mcr.microsoft.com/azuredefender/stable/pod-collector:1.0.248"
+          imagePullPolicy: IfNotPresent
+          
+          
+          securityContext:
+            capabilities:
+              drop:
+                - all
+              add:
+                - NET_RAW
+                - NET_ADMIN
+          resources:
+          
+            limits:
+              cpu: 60m
+              memory: 200Mi
+            requests:
+              cpu: 30m
+              memory: 32Mi
+          env:
+          - name: MIN_LOGGER_LEVEL
+            value: "debug" 
+          - name: WATCH_WINDOWS_NODES
+            value: "true"
+          - name: NODE_RESYNC_DURATION
+            value: "1h"
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          - name: INFRASTRUCTURE
+            value: "azure"      
+          - name: COMPONENT_NAME
+            value: "PodCollectorMisc"
+          - name: CLUSTER_DISTRIBUTION
+            value: "aks"
+          - name: AZURE_RESOURCE_REGION
+            value: "southeastasia"
+          - name: AZURE_RESOURCE_ID
+            value: "/subscriptions/e406a385-feed-47ce-9194-13ed4f88f094/resourceGroups/rg-dsolab-sea/providers/Microsoft.ContainerService/managedClusters/aks-dsolab-sea"
+          - name: IMAGE_VERSION
+            value: "mcr.microsoft.com/azuredefender/stable/pod-collector:1.0.248"
+          - name: RESYNC_DURATION
+            value: "1h"
+          - name: CHART_VERSION
+            value: "0.10.36"
+          volumeMounts:
+            - mountPath: /var/log/microsoft-defender-for-cloud/collectors/PodCollectorMisc
+              name: mdc-podcollectormiscs-log
+            - mountPath: /var/log/microsoft-defender-for-cloud/metrics
+              name: mdc-metrics-log
+            - mountPath: /var/log/microsoft-defender-for-cloud/traces
+              name: mdc-traces-log
+            - name: ca-certs
+              mountPath: /etc/ssl/certs
+              readOnly: true
+            - name: etc-pki-ca-certs
+              mountPath: /etc/pki/ca-trust/extracted
+              readOnly: true
+      tolerations:
+      - key: "CriticalAddonsOnly"
+        operator: "Exists"
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.azure.com/cluster
+                operator: Exists
+              - key: type
+                operator: NotIn
+                values:
+                - virtual-kubelet
+              - key: kubernetes.io/os
+                operator: In
+                values:
+                - linux
+      volumes:
+       - name:  mdc-podcollectormiscs-log
+         hostPath:
+           path: /var/log/microsoft-defender-for-cloud/collectors/PodCollectorMisc
+       - name: mdc-metrics-log
+         hostPath:
+           path: /var/log/microsoft-defender-for-cloud/metrics
+       - name: mdc-traces-log
+         hostPath:
+           path: /var/log/microsoft-defender-for-cloud/traces
+       - name: ca-certs
+         hostPath:
+           path: /etc/ssl/certs
+           type: Directory
+       - name: etc-pki-ca-certs
+         hostPath:
+           path: /etc/pki/ca-trust/extracted
+           type: DirectoryOrCreate
+---
+# Source: microsoft-defender-for-containers/charts/defender-admission-controller/templates/microsoftdefender-gating-admission-webhook-config.yaml
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: defender-admission-controller.mdc.svc
+  labels:
+    app.kubernetes.io/managed-by: "Helm"
+webhooks:
+  - name: defender-admission-controller.mdc.svc
+    failurePolicy: Ignore
+    namespaceSelector:
+      matchExpressions:
+      - key: kubernetes.io/metadata.name
+        operator: NotIn
+        values:
+        - kube-system
+        - gatekeeper-system
+    rules:
+      - operations: ["CREATE", "UPDATE"]
+        apiGroups: ["*"]
+        apiVersions: ["v1"]
+        resources: ["pods", "deployments", "replicasets", "statefulsets", "daemonsets", "jobs", "cronjobs"]
+    clientConfig:
+      service:
+        namespace: mdc
+        name: defender-admission-controller
+        path: "/validate"
+      caBundle: "Cg=="
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    timeoutSeconds: 15
+
