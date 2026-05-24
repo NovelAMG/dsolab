@@ -94,11 +94,13 @@ This mirrors Microsoft's canonical "code → build → ship → deploy → run" 
 
 ---
 
-## Phase 1 — Pure DevOps (no security gates) *— "learn the loop"*
+## Phase 1 — Pure DevOps (no security gates) *— "learn the loop"*  ✅ **DONE** (2026-05-23)
 
 Goal: working SPA → oauth2-proxy → n8n → Azure OpenAI on AKS, deployed by GitHub Actions. Deliberately no security scanning, no admission control, no NetworkPolicy. Defender plan stays enabled but sensor/policy add-on auto-deploy is disabled.
 
 **Split into 6 PR-sized sub-phases.** Each is one feature branch → one PR → one merge → working increment. Don't move on until the previous one is verified.
+
+> **Status snapshot — 2026-05-23**: end-to-end chat working at `https://chat.20.195.16.7.nip.io/`. SPA → MSAL → oauth2-proxy (JWT bearer) → n8n → workload identity → `gpt-4o` returns replies. ADRs 0011–0014 captured runtime decisions made during build (NGINX single-replica, Azure Disk PVC over Files, AKS 3 nodes, n8n vm2 sandbox quirks). PRs #6–#13 cover the work.
 
 ### 1A. Repo + Terraform remote state + GitHub→Azure OIDC
 - **Do**: create empty private repo; add `.gitignore` (Terraform, Node, OS files), `README.md`, `terraform/envs/lab/`, `terraform/modules/`, `docs/decisions/` folders; create a storage account + container in Azure for Terraform state (one-time, via `az cli`); create user-assigned MI for GitHub Actions; add federated credentials for `repo:<org>/<repo>:ref:refs/heads/main` and `repo:<org>/<repo>:pull_request`; assign MI `Contributor` on the lab RG + `Storage Blob Data Contributor` on the state container; write a `hello-world.yml` workflow that runs `az login` via OIDC + `az account show`.
@@ -167,9 +169,29 @@ Goal: working SPA → oauth2-proxy → n8n → Azure OpenAI on AKS, deployed by 
 
 ---
 
-## Phase 2 — Shift-left security in GitHub *(GHAS + Defender for Cloud CLI + supply chain)*
+## Phase 2 — Shift-left security in GitHub *(GHAS + Defender for Cloud CLI + supply chain)*  🟡 **PARTIAL** (2026-05-24)
 
 Goal: every PR gated by security checks. Vulnerabilities caught **before** AKS. Findings flow into Defender for Cloud for code-to-runtime context (used in Phase 5).
+
+> **Status snapshot — 2026-05-24**: GHAS half is live (CodeQL, secret scanning + push protection, Dependabot, branch protection). Defender-dependent items (2A, 2A.1, 2C, 2E) **deferred to Phase 3** because they require Defender for Cloud plans on — ADR 0001 deliberately keeps Defender off until Phase 3 to keep the build phase clean. 2C (image scan) and 2D (IaC scan) were **substituted with OSS equivalents** (Trivy, standalone Checkov) so the gates exist today; we'll swap to the Microsoft-bundled equivalents in Phase 3 when Defender turns on. See **ADR 0015** for the substitution rationale. PR #16 + #17 ship the actual gates and the triage tracking issue.
+>
+> **Where each plan item actually landed:**
+>
+> | Plan item | Status | Reality |
+> |---|---|---|
+> | 2A Defender for DevOps connector | ⏭️ → Phase 3 | Needs Defender CSPM on |
+> | 2A.1 DevOps posture mgmt | ⏭️ → Phase 3 | Depends on 2A |
+> | 2B CodeQL + secret scanning + Dependabot | ✅ done | See PR #16 |
+> | 2B branch protection on `main` | ✅ done | PR required, no force-push/delete, linear history, conversation resolution; required status checks deferred (path-filter conflict, see footnote) |
+> | 2C Defender CLI image scan | 🔄 substituted with Trivy | Same gate purpose; ADR 0015 |
+> | 2D MSDO (Checkov+Terrascan+KubeLinter) | 🔄 substituted with standalone Checkov | Same Checkov engine; Terrascan/KubeLinter coverage missing; ADR 0015 |
+> | 2D blocking on findings | ⏭️ informational at intro | 95 inherited findings; issue #17 tracks triage; flip to blocking once green |
+> | 2E SBOM + cosign | ⏭️ → Phase 3 | Co-locating with Ratify admission policy (no consumer without it) |
+> | 2F.1 Zero Azure secrets | ✅ verified | `gh secret list` empty; all OIDC |
+> | 2F.2 Zero Defender tokens | ✅ N/A | No Defender yet |
+> | 2F.3 Push-protection → webhook | ⏭️ → Phase 3 | Pending Slack/Teams webhook URL |
+>
+> **Footnote on required status checks**: our security workflows use `paths:` filters (only run when relevant files change). Marking them as required would deadlock PRs that touch unrelated paths. Real fix: rewrite workflows so the job always runs but skips work when paths don't match, then add as required. Tracked as follow-up.
 
 ### 2A. Defender for DevOps GitHub connector (prereq for CLI)
 - **Do**: Defender for Cloud → Environment settings → **Add environment → GitHub** → grant the Defender for DevOps GitHub App access to the org/repo. Result: Defender for Cloud can now ingest findings, AND the Defender for Cloud CLI in CI can authenticate via the connector (no tokens in YAML).
@@ -219,9 +241,16 @@ Goal: every PR gated by security checks. Vulnerabilities caught **before** AKS. 
 
 ---
 
-## Phase 3 — Cluster & runtime security on AKS *(Defender for Containers + hardening)*
+## Phase 3 — Cluster & runtime security on AKS *(Defender for Containers + hardening)*  ⏳ **NEXT**
 
 Goal: defense-in-depth at the cluster layer. Even a malicious image that slips past CI gets caught at admission or runtime.
+
+> **Absorbs from Phase 2 (deferred):**
+> - 2A Defender for DevOps GitHub connector (gives Azure-side aggregation of the SARIF that CodeQL/Trivy/Checkov already produce)
+> - 2A.1 DevOps posture management (free output of 2A)
+> - 2C swap Trivy → Defender for Cloud CLI for image scan (same gate, MDVM-backed, results land in Defender portal)
+> - 2E SBOM (syft) + cosign signing — co-located with 3.2's Ratify admission policy because that's the consumer
+> - 2F.3 Push-protection webhook (when a Slack/Teams URL is available)
 
 ### 3.1 Defender for Cloud plans
 - Defender CSPM (paid tier — unlocks attack paths + agentless K8s).
@@ -349,6 +378,7 @@ Goal: prove the stack catches a real recent RCE end-to-end. **Quantify which lay
 
 ## Decisions captured from our discussion
 
+### Original architectural decisions (Phase 0 planning)
 - **Entra Agent ID**: dropped. Too heavy for this lab.
 - **Azure OpenAI auth**: Entra-only via workload identity (`disableLocalAuth: true`). No API key anywhere.
 - **Auth at n8n hop**: oauth2-proxy validating SPA-issued bearer tokens (audience = n8n API app reg).
@@ -356,9 +386,31 @@ Goal: prove the stack catches a real recent RCE end-to-end. **Quantify which lay
 - **MS Learn PowerShell scripts**: not used; all setup is custom Terraform + manifests + small az CLI scripts.
 - **IaC**: Terraform (azurerm + azuread + azapi), remote state in Azure Storage with blob-lease locking.
 - **Defender Containers sensor**: explicitly OFF for Phase 1, deliberately re-enabled in Phase 3.
-- **Container vuln scanner in CI**: Defender for Cloud CLI (replaces Trivy). MDVM-backed → same severities across CI / registry / runtime.
+- **Container vuln scanner in CI**: ~~Defender for Cloud CLI~~ → **Trivy** today, Defender CLI in Phase 3 (see ADR 0015).
 - **Image signing**: cosign keyless via GitHub OIDC. Notary v2 noted as alternative.
 - **CVE-2025-68613**: pin vulnerable version in isolated namespace with no AOAI permission by default; score detection across 9 layers; then patch.
+
+### ADRs filed during execution (live in `docs/decisions/`)
+- **0001** — Defer Defender sensor + Azure Policy add-on to Phase 3
+- **0002** — Terraform (not Bicep)
+- **0003** — Drop Entra Agent ID
+- **0004** — Split AOAI to `australiaeast` for GPT-4o
+- **0005** — Use `nip.io` for lab FQDN (no DNS to manage)
+- **0006** — Disable azurerm provider auto-RP registration
+- **0007** — Separate Terraform runner and human-admin principals
+- **0008** — KV admin assignment via bootstrap, not Terraform
+- **0009** — Bootstrap script manages Entra app regs
+- **0010** — Blob Data role at storage-account scope (not container)
+- **0011** — NGINX single-replica + Local externalTrafficPolicy (cost vs resilience trade-off for lab)
+- **0012** — Azure Disk PVC instead of Files (Defender CSPM blocks Files shared-key auth)
+- **0013** — Scale AKS to 3 nodes (Defender + Gatekeeper overhead on B2s)
+- **0014** — n8n Code-node vm2 sandbox quirks (`require`, `process.env`, `URLSearchParams`)
+- **0015** — Phase 2 supply-chain gates (CodeQL + Trivy + Checkov + Dependabot; Defender substitutions explained)
+
+### Operational state captured (out-of-band changes, not yet in dedicated ADRs)
+- **Dependabot security updates**: enabled via `gh api PUT repos/.../automated-security-fixes` (not expressible as a repo file)
+- **Secret scanning + push protection**: enabled via GitHub portal (public-repo default)
+- **Branch protection on `main`** (2026-05-24): PR required, 0 approvals (solo), linear history, no force push, no deletions, conversation resolution required, **admins not enforced** (break-glass). Required status checks: not yet enabled (path-filter conflict, tracked as follow-up).
 
 ---
 
