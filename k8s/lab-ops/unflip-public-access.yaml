@@ -108,6 +108,19 @@ spec:
                     -n kv-dsolab-sea-xsqb -g rg-dsolab-sea \
                     --public-network-access Enabled \
                     --query "{name:name, pna:properties.publicNetworkAccess}" -o table
+                  echo "[unflip] check Postgres state..."
+                  PG_STATE=$(az postgres flexible-server show \
+                    -n psql-dsolab-sea-xsqb -g rg-dsolab-sea \
+                    --query state -o tsv)
+                  echo "[unflip] Postgres state: $PG_STATE"
+                  if [ "$PG_STATE" != "Ready" ]; then
+                    echo "[unflip] starting Postgres..."
+                    az postgres flexible-server start \
+                      -n psql-dsolab-sea-xsqb -g rg-dsolab-sea \
+                      --query state -o tsv
+                  else
+                    echo "[unflip] Postgres already Ready; skipping start."
+                  fi
                   echo "[unflip] done."
           volumes:
             - name: tmp
