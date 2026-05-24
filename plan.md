@@ -241,45 +241,94 @@ Goal: every PR gated by security checks. Vulnerabilities caught **before** AKS. 
 
 ---
 
-## Phase 3 — Cluster & runtime security on AKS *(Defender for Containers + hardening)*  ⏳ **NEXT**
+## Phase 3 — Cluster & runtime security on AKS *(Defender for Containers + hardening)*  🟡 **IN PROGRESS** (2026-05-24)
 
 Goal: defense-in-depth at the cluster layer. Even a malicious image that slips past CI gets caught at admission or runtime.
 
-> **Absorbs from Phase 2 (deferred):**
-> - 2A Defender for DevOps GitHub connector (gives Azure-side aggregation of the SARIF that CodeQL/Trivy/Checkov already produce)
-> - 2A.1 DevOps posture management (free output of 2A)
-> - 2C swap Trivy → Defender for Cloud CLI for image scan (same gate, MDVM-backed, results land in Defender portal)
-> - 2E SBOM (syft) + cosign signing — co-located with 3.2's Ratify admission policy because that's the consumer
-> - 2F.3 Push-protection webhook (when a Slack/Teams URL is available)
+> **Status snapshot — 2026-05-24**: 3.1–3.3 are **DONE** (Defender plans, DevOps connector, runtime sensor live on AKS). Current focus is **3.6 cosign signing** + **3.7 Defender Image Integrity** (the gated-deployment loop). NetworkPolicy (3.4) and KV CSI (3.5) deferred for now — we'll loop back after the supply-chain admission loop is closed. See **ADR 0016** for the decision to use Defender Image Integrity instead of raw Ratify.
+>
+> **Where each sub-phase actually is:**
+>
+> | # | Item | Status | Notes |
+> |---|---|---|---|
+> | 3.1 | Defender plans (CSPM, Containers + extensions) | ✅ done | All enabled subscription-wide since 2025-08; sensor live 2026-05-23 |
+> | 3.2 | Defender for DevOps GitHub connector + agentless code scan | ✅ done | `personal-github-repo` connector wired to `tonzking123`, both `CspmMonitorGithub` and `DefenderForDevOpsGithub` offerings active. Closes Phase 2's 2A. |
+> | 3.3 | Runtime sensor on AKS | ✅ done (AKS add-on) | 8 Defender pods running in `kube-system`. ADR 0001 deferral ended. |
+> | 3.4 | NetworkPolicy default-deny in `n8n` ns | ⏸️ deferred | Will revisit; low priority for solo lab without lateral-movement risk yet |
+> | 3.5 | Key Vault CSI — secrets out of K8s | ⏸️ deferred | Same |
+> | **3.6** | **Cosign signing in CI** (build-time attestation) | ⏳ NEXT | Pre-req for 3.7 |
+> | **3.7** | **Defender Image Integrity** (gated deployment on signature + CVE) | ⏳ NEXT | Via portal toggle + Azure Policy; consumes 3.6 signatures. ADR 0016 |
+> | 3.8 | Switch Defender sensor add-on → Helm | 🔜 later | Required to unlock Antimalware + Binary drift **blocking** (preview); plan before Phase 5 detonation |
+> | 3.9 | Ingress hardening (AFD/WAF, AOAI private endpoint) | 🔜 later | Was 3.3 in original numbering; renumbered to avoid confusion |
+> | 3.10 | Logging + drift detection (already partially on via 3.3) | 🔜 later | Was 3.4 in original numbering |
 
-### 3.1 Defender for Cloud plans
-- Defender CSPM (paid tier — unlocks attack paths + agentless K8s).
-- **Defender for Containers** — agentless image scanning in ACR + AKS, runtime threat detection (Defender DaemonSet via Azure Policy), K8s data plane recommendations.
-- Use `azqr` to baseline before/after each phase.
+### 3.1 Defender plans — ✅ DONE
+- ~~Defender CSPM (paid tier — unlocks attack paths + agentless K8s).~~ **ON**
+- ~~**Defender for Containers** — agentless image scanning in ACR + AKS, runtime threat detection, K8s data plane recommendations.~~ **ON** (all 5 extensions enabled including Container Sensor)
+- ~~Use `azqr` to baseline before/after each phase.~~ TBD when running first compliance scan
 
-### 3.2 AKS hardening (re-deploy with these on)
-- **Private cluster** + jump box or `az aks command invoke` for kubectl.
-- **Azure CNI Overlay** + Cilium **NetworkPolicy**. Default-deny in `n8n` namespace. Allow: ingress → oauth2-proxy, oauth2-proxy → n8n, n8n → postgres, n8n → AOAI (egress), n8n → login.microsoftonline.com (egress for token fetch).
-- **Pod Security Admission** = `restricted` on `n8n` namespace.
-- **Key Vault Provider for Secrets Store CSI Driver** — move n8n encryption key, DB password, oauth2-proxy cookie secret/client secret OUT of K8s secrets into Key Vault. Pods fetch via workload identity.
-- **Ratify** admission controller + cosign verification → AKS refuses unsigned images.
+### 3.2 Defender for DevOps connector + agentless code scan — ✅ DONE
+- ~~Connect Defender for Cloud to GitHub org.~~ **ON** (`personal-github-repo` connector, scope = `tonzking123` org)
+- ~~Add `DefenderForDevOpsGitHub` offering for code-findings ingestion.~~ **ON** (added via CSPM plan config → Agentless code scanning toggle)
+- ~~All 5 Microsoft-side scanners enabled: ESLint, Bandit, Template Analyzer, Checkov, Trivy.~~ **ON**
+- Closes Phase 2's deferred items **2A** (connector) and **2A.1** (posture).
 
-### 3.3 Ingress hardening
+### 3.3 Runtime sensor on AKS — ✅ DONE (AKS add-on)
+- ~~Container Sensor extension toggled on via Defender for Containers settings.~~ **ON** (2026-05-23)
+- DaemonSets running: `microsoft-defender-collector-ds` (3 pods), `microsoft-defender-publisher-ds` (3 pods), plus `defender-admission-controller` and `microsoft-defender-collector-misc`.
+- **ADR 0001 deferral ended.** See 3.8 below for the Helm-switch decision (deferred until before Phase 5).
+
+### 3.4 NetworkPolicy default-deny in `n8n` namespace — ⏸️ DEFERRED
+- Cilium CNI Overlay is in place (Phase 1B), so the policy engine is ready.
+- Plan: default-deny + 5 allow rules (ingress→oauth2-proxy, oauth2-proxy→n8n, n8n→postgres, n8n→AOAI, n8n→Entra).
+- Deferred because: with a solo lab and no real lateral-movement risk yet, this is gold-plating. Will revisit after the supply-chain loop (3.6/3.7) is closed.
+
+### 3.5 Key Vault CSI driver — ⏸️ DEFERRED
+- Plan: enable Azure Key Vault Secrets Provider AKS add-on, write `SecretProviderClass`, move Postgres password + n8n encryption key + oauth2-proxy secrets out of K8s Secrets into KV.
+- Deferred for same reason as 3.4.
+
+### 3.6 Cosign signing in CI — ⏳ NEXT (build-time provenance)
+- **What**: GitHub Actions builds SPA image → pushes to ACR → `cosign sign --yes $IMAGE@$DIGEST` using GitHub OIDC keyless. Signature stored alongside image in ACR as OCI artifact.
+- **Why**: pure attestation step. Produces evidence; doesn't enforce. **Required by 3.7** (the enforcement gate).
+- **Where configured**: `.github/workflows/build-spa.yml` (or extend `scripts/08-build-and-push-spa.sh`); requires `id-token: write` permission (already have). Nothing in Azure portal.
+- **Risk**: low. Pure-additive.
+- **Verify**: `cosign verify --certificate-identity-regexp 'https://github.com/tonzking123/dsolab/.*' --certificate-oidc-issuer https://token.actions.githubusercontent.com $IMAGE@$DIGEST` returns OK. `oras discover -o tree $IMAGE` shows attached `.sig` artifact.
+
+### 3.7 Defender Image Integrity — ⏳ NEXT (admission / gated deployment)
+- **What**: AKS admission controller that rejects pods whose images aren't signed by our CI's GitHub OIDC identity **AND** have no Critical CVE findings from Defender's MDVM scanner.
+- **Why**: closes the supply-chain loop. Attacker pushing a malicious image to ACR or replacing a tag → admission rejects. Single policy gates on BOTH signature AND vulnerability findings.
+- **Where configured**:
+>   - **Portal**: Defender for Cloud → Workload protections → Image Integrity (preview) → enable for `aks-dsolab-sea`. Microsoft auto-deploys Ratify in `gatekeeper-system`.
+>   - **Or CLI**: `az aks update --name aks-dsolab-sea --enable-image-integrity`
+>   - **Code (PR)**: Azure Policy assignment (custom or built-in) scoped to namespace `n8n` only. Allow images signed by `repo:tonzking123/dsolab:*` AND with no Critical CVE.
+- **Risk**: HIGH if scoped cluster-wide. Always start at namespace scope. Keep `kube-system` and `gatekeeper-system` excluded.
+- **Verify**:
+>   1. Negative: `kubectl run x --image=nginx -n n8n` → REJECTED ("image not signed")
+>   2. Positive: redeploy n8n's signed SPA → ADMITTED
+>   3. Phase 1F smoke test still passes (signed images still run)
+- **Why this over raw Ratify**: see ADR 0016. Short version: Microsoft-managed upgrades, single Azure Policy syntax, unified findings in Defender portal, one policy gates BOTH signature + CVEs.
+
+### 3.8 Switch Defender sensor add-on → Helm — 🔜 LATER (before Phase 5)
+- **Why**: AKS add-on path doesn't include `anti-malware-collector`. Per the [support matrix](https://learn.microsoft.com/en-us/azure/defender-for-cloud/support-matrix-defender-for-containers), Antimalware (GA) and Binary drift **blocking** (preview) both require "Defender sensor via Helm".
+- **What changes**: uninstall AKS-managed sensor; `helm install` Microsoft's Defender chart in `kube-system`; we own upgrades.
+- **Plan it for Phase 5 entry**: Phase 5 detonates CVE-2025-68613 (n8n RCE). With drift blocking on (Helm-only), the reverse-shell binary is BLOCKED, not just detected. Much more dramatic scorecard outcome.
+
+### 3.9 Ingress hardening — 🔜 LATER
 - **Azure Front Door + WAF** (managed ruleset) in front of n8n. Block direct ingress IP via NSG (only AFD service tag allowed).
 - Rate-limit `/webhook/*` heavily — n8n webhooks are a known abuse vector.
 - Azure OpenAI: switch `publicNetworkAccess: 'Disabled'`, add **private endpoint** in AKS subnet, n8n reaches AOAI via private DNS.
 
-### 3.4 Logging + runtime drift protection
+### 3.10 Logging + drift detection — 🔜 LATER (partially on already via 3.3)
 - AKS diagnostic settings → Log Analytics (control plane, audit, kube-audit-admin).
 - Container Insights enabled.
 - Defender for Containers alerts route to Defender for Cloud (and Sentinel in Phase 6).
-- **Drift protection (Defender for Containers feature)**: detects processes/files that didn't exist in the container image when it started — exactly the signal a CVE-2025-68613 reverse shell will produce. Enable per-cluster in Defender for Cloud → Containers → Settings.
+- **Binary drift DETECTION** is already on as part of 3.3 (no Helm needed); **blocking** is part of 3.8.
 
-**Verification (Phase 3):**
-1. `kubectl run --rm -it test --image=nginx` in `n8n` ns → blocked by Ratify (unsigned).
-2. `kubectl exec` into n8n pod, `curl http://<other-namespace-pod>` → blocked by NetworkPolicy.
-3. Azure OpenAI private endpoint resolves only inside the AKS VNet; public requests get 403.
-4. Smoke test from Phase 1F **still passes**.
+**Verification (Phase 3, current scope = 3.6 + 3.7):**
+1. `cosign verify` succeeds against the SPA image's signature.
+2. `kubectl run --rm -it test --image=nginx` in `n8n` ns → blocked by Image Integrity.
+3. Re-deploy signed SPA → admitted; Phase 1F smoke test still passes.
+4. Image Integrity findings appear in Defender for Cloud → Recommendations.
 
 ---
 
@@ -406,6 +455,7 @@ Goal: prove the stack catches a real recent RCE end-to-end. **Quantify which lay
 - **0013** — Scale AKS to 3 nodes (Defender + Gatekeeper overhead on B2s)
 - **0014** — n8n Code-node vm2 sandbox quirks (`require`, `process.env`, `URLSearchParams`)
 - **0015** — Phase 2 supply-chain gates (CodeQL + Trivy + Checkov + Dependabot; Defender substitutions explained)
+- **0016** — Use Defender for Cloud Image Integrity instead of raw Ratify for the 3.7 admission gate (Microsoft-managed Ratify; single Azure Policy syntax; gates on BOTH signature AND vulnerability findings)
 
 ### Operational state captured (out-of-band changes, not yet in dedicated ADRs)
 - **Dependabot security updates**: enabled via `gh api PUT repos/.../automated-security-fixes` (not expressible as a repo file)
