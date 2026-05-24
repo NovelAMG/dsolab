@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GHAS License & Story Alignment — DevSecOps Lab</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+  const theme = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'default' : 'dark';
+  mermaid.initialize({ startOnLoad: true, theme: theme, securityLevel: 'loose' });
+</script>
+<style>
+:root {
+  --bg: #0f1419;
+  --panel: #161b22;
+  --panel-2: #1f2733;
+  --text: #e6edf3;
+  --muted: #8b949e;
+  --accent: #58a6ff;
+  --accent-2: #7ee787;
+  --warn: #f0883e;
+  --danger: #ff7b72;
+  --border: #30363d;
+  --code-bg: #0d1117;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #ffffff; --panel: #f6f8fa; --panel-2: #eaeef2; --text: #1f2328;
+    --muted: #656d76; --accent: #0969da; --accent-2: #1a7f37; --warn: #bc4c00;
+    --danger: #cf222e; --border: #d0d7de; --code-bg: #f6f8fa;
+  }
+}
+* { box-sizing: border-box; }
+html, body { background: var(--bg); color: var(--text); margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  font-size: 15px; line-height: 1.65;
+  max-width: 1100px; margin: 0 auto; padding: 32px 24px 64px;
+}
+h1 { font-size: 30px; margin: 0 0 8px; }
+h2 { font-size: 22px; margin: 40px 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); color: var(--accent); }
+h3 { font-size: 17px; margin: 24px 0 8px; color: var(--accent-2); }
+h4 { font-size: 15px; margin: 16px 0 6px; color: var(--text); }
+p { margin: 10px 0; }
+.subtitle { color: var(--muted); margin-bottom: 24px; font-size: 16px; }
+.kicker { font-size: 14px; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+code { background: var(--code-bg); padding: 2px 6px; border-radius: 4px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 13px; color: var(--accent-2); }
+pre { background: var(--code-bg); padding: 14px; border-radius: 6px; overflow-x: auto; border: 1px solid var(--border); font-size: 13px; line-height: 1.5; }
+pre code { background: none; padding: 0; color: var(--text); }
+table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 14px; }
+th, td { border: 1px solid var(--border); padding: 10px 14px; text-align: left; vertical-align: top; }
+th { background: var(--panel-2); font-weight: 600; }
+tr:nth-child(even) td { background: var(--panel); }
+ul, ol { padding-left: 24px; }
+li { margin: 6px 0; }
+.callout { background: var(--panel); border-left: 4px solid var(--accent); padding: 14px 18px; border-radius: 4px; margin: 20px 0; }
+.callout.tip { border-left-color: var(--accent-2); }
+.callout.warn { border-left-color: var(--warn); }
+.callout.danger { border-left-color: var(--danger); }
+.callout.handoff { border-left-color: var(--warn); background: rgba(240,136,62,0.08); }
+.mermaid {
+  background: var(--panel);
+  padding: 20px;
+  border-radius: 8px;
+  margin: 20px 0;
+  text-align: center;
+  border: 1px solid var(--border);
+  overflow-x: auto;
+}
+.mermaid svg { max-width: 100%; height: auto; }
+hr { border: none; border-top: 1px solid var(--border); margin: 36px 0; }
+.toc {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 18px 24px;
+  margin: 20px 0 30px;
+}
+.toc ol { margin: 8px 0; }
+.toc a { color: var(--accent); text-decoration: none; }
+.toc a:hover { text-decoration: underline; }
+.badge {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 3px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  display: inline-block;
+}
+.badge-ok { background: rgba(126,231,135,0.15); color: var(--accent-2); border: 1px solid var(--accent-2); }
+.badge-warn { background: rgba(240,136,62,0.15); color: var(--warn); border: 1px solid var(--warn); }
+.badge-bad { background: rgba(255,123,114,0.15); color: var(--danger); border: 1px solid var(--danger); }
+.badge-na { background: rgba(139,148,158,0.15); color: var(--muted); border: 1px solid var(--muted); }
+.qbox {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 22px;
+  margin: 14px 0;
+}
+.qbox h4 { margin-top: 0; color: var(--accent); }
+@media print {
+  body { max-width: none; padding: 0; color: #000; background: #fff; }
+  h2 { page-break-before: always; }
+  .mermaid { page-break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+
+<div class="kicker">DevSecOps Lab — Reference Document</div>
+<h1>GHAS License &amp; Story Alignment</h1>
+<p class="subtitle">
+Current state of GitHub Advanced Security licensing for <code>tonzking123/dsolab</code>,
+how our setup aligns with Microsoft's published Defender for Cloud + DevOps story,
+and what would change if we migrate to a GitHub Enterprise org with GHAS enabled.
+Hand this to a fresh chat to scope a migration plan.
+</p>
+
+<div class="callout handoff">
+<strong>Hand-off intent.</strong> This is a self-contained briefing. Read top-to-bottom.
+Section 7 lists the questions a new chat should ask before doing anything destructive.
+</div>
+
+<div class="toc">
+<strong>Contents</strong>
+<ol>
+  <li><a href="#tldr">TL;DR</a></li>
+  <li><a href="#license">What GHAS actually is, license-wise</a></li>
+  <li><a href="#alignment">Our current alignment vs Microsoft docs</a></li>
+  <li><a href="#migration">Migration considerations — personal → org</a></li>
+  <li><a href="#decision">Decision matrix</a></li>
+  <li><a href="#next">Recommended next moves (independent of GHAS)</a></li>
+  <li><a href="#questions">Open questions for the next chat</a></li>
+  <li><a href="#refs">References</a></li>
+</ol>
+</div>
+
+<hr>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2 id="tldr">1. TL;DR</h2>
+
+<ul>
+  <li>We are running the <strong>OSS half</strong> of Phase 2 supply-chain security on a public personal-account repo (<code>tonzking123/dsolab</code>).</li>
+  <li>We get the <strong>scanning</strong> half: CodeQL, secret scanning, push protection, Dependabot, Trivy, Checkov — all working, findings in GitHub Security tab + Defender for Cloud DevOps view.</li>
+  <li>We do NOT get the <strong>enrichment</strong> half: runtime-aware alert prioritization, one-click GitHub issues with runtime context, code-to-runtime mapping, Copilot Autofix. <strong>These all require a paid GHAS license</strong>.</li>
+  <li>A GHAS license requires a paid <strong>GitHub Enterprise Cloud</strong> subscription. <strong>Cannot be bought standalone.</strong> Cheapest entry point ≈ <strong>$70/user/month</strong> for one solo person.</li>
+  <li>For our lab, the practical play is a <strong>30-day free Enterprise Cloud trial</strong> before the Phase 5 CVE-2025-68613 demo. Skip until then.</li>
+</ul>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2 id="license">2. What GHAS actually is, license-wise</h2>
+
+<h3>Two paid SKUs (since 2024)</h3>
+<table>
+<tr><th>SKU</th><th>What it gives you</th><th>List price</th></tr>
+<tr><td><strong>GitHub Secret Protection</strong></td><td>Secret scanning, push protection, AI-based generic secret detection, validity checks</td><td>~$19/active-committer/mo</td></tr>
+<tr><td><strong>GitHub Code Security</strong></td><td>CodeQL, Copilot Autofix, dependency review, security overview, security campaigns</td><td>~$30/active-committer/mo</td></tr>
+<tr><td>Both combined (older "GHAS" bundle)</td><td>Everything above</td><td>~$49/active-committer/mo</td></tr>
+</table>
+
+<h3>Prerequisite: GHEC subscription</h3>
+<p>GHAS is an <strong>add-on</strong>, never sold standalone. You first need:</p>
+<table>
+<tr><th>GitHub plan</th><th>Monthly cost</th><th>Can buy GHAS?</th></tr>
+<tr><td>Free (personal)</td><td>$0</td><td>❌</td></tr>
+<tr><td>Pro (personal)</td><td>~$4/user</td><td>❌</td></tr>
+<tr><td>Team (org)</td><td>~$4/user</td><td>❌</td></tr>
+<tr><td><strong>Enterprise Cloud (org)</strong></td><td><strong>~$21/user</strong> base</td><td>✅</td></tr>
+<tr><td><strong>Enterprise Server (self-hosted)</strong></td><td>~$21/user</td><td>✅</td></tr>
+</table>
+
+<p><strong>Bottom-line cost for one solo developer wanting GHAS on a private repo:</strong></p>
+<pre><code>GitHub Enterprise Cloud:  $21/user/mo
++ GHAS bundle:            $49/user/mo
+= $70/user/month  →  $840/year  for one person</code></pre>
+
+<h3>Minimum seats</h3>
+<table>
+<tr><th>Buying channel</th><th>Minimum seats</th><th>Notes</th></tr>
+<tr><td><strong>Self-serve at github.com</strong></td><td><strong>1 seat</strong></td><td>Solo dev, can buy via UI</td></tr>
+<tr><td><strong>Azure Marketplace</strong></td><td>Usually 1 for GHEC; GHAS add-on minimum varies</td><td>Bill through existing Azure subscription</td></tr>
+<tr><td><strong>GitHub Sales / Microsoft Volume Licensing</strong></td><td><strong>25–50 seats</strong></td><td>Enterprise procurement</td></tr>
+</table>
+
+<h3>"Active committer" billing — the catch</h3>
+<ul>
+  <li>Counted: anyone who pushed to ANY repo in the org in the last 90 days (not just GHAS-enabled repos)</li>
+  <li>Contractor who pushes once → counts for 90 days</li>
+  <li>Bot accounts that push → count (some bots excluded: Dependabot, GitHub Actions tokens)</li>
+  <li>Resets only after 90 days of inactivity from that user</li>
+  <li>For a solo lab: 1 active committer = 1 billed seat</li>
+</ul>
+
+<div class="callout tip">
+<strong>Free 30-day Enterprise trial.</strong>
+<code>github.com/enterprise → "Start free trial"</code> — full Enterprise Cloud + GHAS features,
+no commitment. Cancel before day 30 → no charge. This is the practical demo path —
+light it up just before Phase 5.
+</div>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2 id="alignment">3. Our current alignment vs Microsoft docs</h2>
+
+<p>Three Microsoft Learn docs define what "Defender for Cloud + DevOps" looks like
+in the published story. Here's how our setup measures up.</p>
+
+<h3>3.1 — GHAS integration with Defender for Cloud <span class="badge badge-warn">Partial</span></h3>
+<p><a href="https://learn.microsoft.com/en-us/azure/defender-for-cloud/github-advanced-security-overview">learn.microsoft.com/.../github-advanced-security-overview</a></p>
+
+<table>
+<tr><th>Prerequisite</th><th>Our state</th><th>Status</th></tr>
+<tr><td>GitHub connector to Defender</td><td><code>personal-github-repo</code> connector live</td><td>✅</td></tr>
+<tr><td>Defender CSPM enabled</td><td>On subscription</td><td>✅</td></tr>
+<tr><td><strong>GHAS license</strong></td><td><code>dsolab</code> is on personal account, no GHEC, no GHAS</td><td>❌</td></tr>
+<tr><td>Security Admin + GH org owner roles</td><td>both held by Thobthuan</td><td>✅</td></tr>
+</table>
+
+<p><strong>What works for us today:</strong></p>
+<ul>
+  <li>✅ Connector ingests our CodeQL alerts (public-repo CodeQL is free)</li>
+  <li>✅ Defender's own agentless scanners (Trivy, Checkov, ESLint, Bandit, Template Analyzer) populate Defender portal findings independently</li>
+</ul>
+
+<p><strong>What we DON'T get without the GHAS license:</strong></p>
+<ul>
+  <li>❌ <strong>Production-aware alert prioritization</strong> — the "this CVE is in code that's internet-exposed in AKS" overlay enriching GitHub Security tab</li>
+  <li>❌ <strong>Unified AI-driven remediation</strong> — one-click "create GitHub issue with full SDLC + runtime context, assigned to CODEOWNERS"</li>
+  <li>❌ <strong>Runtime Risk Factors</strong> (Internet Exposure, Sensitive Data, Critical Resources, Lateral Movement) bubbling back into GitHub</li>
+  <li>❌ <strong>Copilot Autofix</strong> for code findings</li>
+</ul>
+
+<p>This is also why the Defender portal shows <code>dsolab</code> with the
+<strong>"Advanced security: Off"</strong> badge — the badge specifically reads
+the GHAS license flag.</p>
+
+<h3>3.2 — Container image mapping (code-to-runtime) <span class="badge badge-bad">Not aligned</span></h3>
+<p><a href="https://learn.microsoft.com/en-us/azure/defender-for-cloud/container-image-mapping">learn.microsoft.com/.../container-image-mapping</a></p>
+
+<table>
+<tr><th>Prerequisite</th><th>Our state</th><th>Status</th></tr>
+<tr><td>Defender CSPM</td><td>—</td><td>✅</td></tr>
+<tr><td>Image built through a CI/CD pipeline</td><td>Built locally via <code>scripts/08-build-and-push-spa.sh</code></td><td>❌</td></tr>
+<tr><td>Image discoverable (in ACR or running in K8s)</td><td>Both</td><td>✅</td></tr>
+</table>
+
+<p>Three mapping methods exist in the doc — we have <strong>none</strong>:</p>
+<table>
+<tr><th>Option</th><th>What</th><th>Our state</th></tr>
+<tr><td>1. Auto via connector</td><td>Image built+pushed from GitHub Actions, connector auto-maps</td><td>❌ we push from laptop, not Actions</td></tr>
+<tr><td>2. Docker LABELs</td><td><code>LABEL org.opencontainers.image.source=...</code> in Dockerfile</td><td>❌ no source labels</td></tr>
+<tr><td>3. GitHub attestations</td><td><code>actions/attest-build-provenance</code> in CI workflow</td><td>❌ no attestation step</td></tr>
+</table>
+
+<div class="callout warn">
+<strong>Why this matters for Phase 5</strong>: when we detonate CVE-2025-68613,
+MSEM should draw an attack-path graph from "vulnerable image → AKS pod → exposed via ingress → ...mapped back to PR #N".
+Without code-to-cloud mapping, the trace breaks at the image — we can't link back to which PR introduced the vulnerable version.
+</div>
+
+<h4>Easy fix today (no GHAS license needed)</h4>
+<pre><code># spa/Dockerfile — add OCI labels (Option 2)
+LABEL org.opencontainers.image.source="https://github.com/tonzking123/dsolab"
+LABEL org.opencontainers.image.revision="${VITE_GIT_SHA}"</code></pre>
+
+<p>Plus <code>--build-arg VITE_GIT_SHA=$(git rev-parse HEAD)</code> in the build script.</p>
+
+<h4>Better fix</h4>
+<p>Move SPA build into GitHub Actions and add <code>actions/attest-build-provenance</code> — gives Option 1 (auto) + Option 3 (attestation) simultaneously, plus reproducible builds. This is what's tracked as <strong>Phase 3.6</strong> in the lab plan.</p>
+
+<h3>3.3 — IaC template mapping <span class="badge badge-na">N/A — Azure DevOps only</span></h3>
+<p><a href="https://learn.microsoft.com/en-us/azure/defender-for-cloud/iac-template-mapping">learn.microsoft.com/.../iac-template-mapping</a></p>
+
+<table>
+<tr><th>Prerequisite</th><th>Our state</th><th>Status</th></tr>
+<tr><td>Defender CSPM</td><td>—</td><td>✅</td></tr>
+<tr><td><strong>Azure DevOps</strong> environment in Defender</td><td>We use GitHub Actions</td><td>❌ blocking</td></tr>
+<tr><td>Azure Pipelines running MSDO with <code>IaCFileScanner</code></td><td>—</td><td>❌ blocking</td></tr>
+<tr><td>Tag values are GUIDs (<code>yor_trace</code> / <code>mapping_tag</code>)</td><td>Semantic tags only</td><td>❌</td></tr>
+<tr><td>Supported template language</td><td>Terraform</td><td>✅</td></tr>
+</table>
+
+<p><strong>Verdict</strong>: as of the doc's last update (June 2025), the MSDO IaC file scanner mapping logic was built for ADO pipelines and hasn't been ported to GitHub Actions. To unlock IaC template mapping today, we'd need to mirror the repo to ADO and run MSDO there. <strong>Not worth it for a lab.</strong></p>
+
+<p><strong>What we still get on GitHub today:</strong></p>
+<ul>
+  <li>✅ Defender's agentless Checkov scan (already on) finds misconfigurations in our TF files</li>
+  <li>❌ Does NOT link "this storage account that exists in Azure" back to "this <code>azurerm_storage_account</code> block in this commit"</li>
+</ul>
+
+<p>Track for "when Microsoft ships this for GitHub". No action.</p>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2 id="migration">4. Migration considerations — personal → org</h2>
+
+<h3>Standard GHEC vs Enterprise Managed Users (EMU)</h3>
+<table>
+<tr><th>Flavor</th><th>How you log in</th><th>Picks</th></tr>
+<tr><td><strong>Standard GHEC (with personal accounts)</strong></td><td>Same <code>@tonzking123</code> you use today</td><td>Solo, lab, small team, anyone wanting flexibility</td></tr>
+<tr><td><strong>EMU — Enterprise Managed Users</strong></td><td>New dedicated account <code>tonzking123_&lt;orgname&gt;</code> that ONLY exists inside the enterprise</td><td>Banks, regulated industries, strict SSO/lifecycle requirements</td></tr>
+</table>
+
+<p><strong>For our lab: standard GHEC.</strong> Personal account stays, just gets invited as the org's owner.</p>
+
+<h3>What changes in the standard GHEC model</h3>
+<table>
+<tr><th>Thing</th><th>Personal account</th><th>Org context</th></tr>
+<tr><td>Login credentials</td><td>Same</td><td>Same</td></tr>
+<tr><td>2FA / passkey</td><td>Same</td><td>Required by enterprise policy if admin enforces</td></tr>
+<tr><td>Personal repos (e.g., scratch repos)</td><td>Yours, unchanged</td><td>N/A</td></tr>
+<tr><td>Org repos (<code>dsolab</code> after transfer)</td><td>N/A</td><td>New, owned by org</td></tr>
+<tr><td>Profile / contribution graph</td><td>Yours</td><td>Contributions count both places</td></tr>
+<tr><td>Billing for personal GitHub Pro</td><td>You pay if you want it</td><td>Enterprise pays for your seat</td></tr>
+<tr><td>Personal Copilot subscription</td><td>You pay</td><td>Enterprise can also give you Copilot Business — both can coexist</td></tr>
+</table>
+
+<h3>Where to check GHAS / security features after migrating</h3>
+<table>
+<tr><th>URL</th><th>What it shows</th></tr>
+<tr><td><code>github.com/organizations/&lt;ORG&gt;/settings/security_analysis</code></td><td><strong>Org-level toggles</strong> — the single source of truth for which security features are licensed and on</td></tr>
+<tr><td><code>github.com/organizations/&lt;ORG&gt;/billing/seats</code></td><td>Seat count + GHAS active committer count + actual line items being billed</td></tr>
+<tr><td><code>github.com/enterprises/&lt;ENT&gt;/settings/policies/code_security</code></td><td>Enterprise-wide policies across all orgs (only if you have an Enterprise Account)</td></tr>
+<tr><td><code>github.com/&lt;ORG&gt;/&lt;REPO&gt;/settings/security_analysis</code></td><td>Per-repo override of org-level settings</td></tr>
+<tr><td><code>github.com/&lt;ORG&gt;/&lt;REPO&gt;/security</code></td><td>Actual findings (Security tab)</td></tr>
+</table>
+
+<h3>CLI shortcuts</h3>
+<pre><code># Your account + orgs you belong to
+gh api user
+gh api user/orgs --jq '.[].login'
+
+# Org plan tier (look for plan.name)
+gh api orgs/&lt;ORG-NAME&gt; --jq '{plan, default_repo_permission, two_factor_requirement_enabled}'
+
+# Org-wide GHAS billing — only works IF GHAS is purchased
+gh api orgs/&lt;ORG-NAME&gt;/settings/billing/advanced-security \
+  --jq '{committers: .total_advanced_security_committers, cost: .estimated_paid_advanced_security_committers}'
+
+# Repo-level security flags (works without GHAS, shows what's on per repo)
+gh api repos/&lt;ORG&gt;/&lt;REPO&gt; --jq '.security_and_analysis'
+
+# Across all repos in an org — find which have GHAS enabled
+gh api orgs/&lt;ORG-NAME&gt;/repos --paginate \
+  --jq '.[] | {name: .name, ghas: .security_and_analysis.advanced_security}'</code></pre>
+
+<h3>Migration step-by-step (the trial path)</h3>
+
+<div class="mermaid">
+flowchart LR
+  A["1. Create org<br/>tonzking-lab"]
+  B["2. Start GHEC<br/>30-day trial"]
+  C["3. Transfer<br/>dsolab to org"]
+  D["4. Enable GHAS<br/>on org settings"]
+  E["5. Defender badge<br/>flips to On"]
+  F["6. Run Phase 5<br/>demo"]
+  G["7. Cancel trial<br/>before day 30"]
+  A --> B --> C --> D --> E --> F --> G
+  classDef ok fill:#1a3a2a,stroke:#7ee787
+  classDef end_ fill:#3a2a1a,stroke:#f0883e
+  class E,F ok
+  class G end_
+</div>
+
+<pre><code>1. github.com/account/organizations/new
+   → create a free org (e.g., tonzking-lab)
+
+2. github.com/organizations/tonzking-lab/billing/upgrade
+   → start "Enterprise Cloud" 30-day trial
+
+3. github.com/tonzking123/dsolab/settings
+   → Transfer ownership → new owner = tonzking-lab
+   → Old URL auto-redirects
+
+4. github.com/organizations/tonzking-lab/settings/security_analysis
+   → Enable GitHub Advanced Security
+   → Enable for new repositories
+   → Confirm seat count (1)
+
+5. Wait ~10 minutes, then check
+   Defender for Cloud → DevOps security → dsolab
+   → Badge should flip from "Off" to "Advanced security: On"
+
+6. Run Phase 5 demo with full code-to-runtime correlation
+
+7. Before day 30:
+   github.com/organizations/tonzking-lab/billing → cancel trial
+   OR transfer the repo back to your personal account first</code></pre>
+
+<h3>Things that WILL break if not handled during migration</h3>
+<div class="callout danger">
+<strong>The migration breaks several Azure/GitHub integration points that we set up
+during Phase 1. Each needs an explicit update.</strong>
+</div>
+
+<table>
+<tr><th>What breaks</th><th>Why</th><th>How to fix</th></tr>
+<tr><td><strong>TF apply workflow (OIDC)</strong></td><td>Federated credential on <code>mi-gha-dsolab</code> MI is bound to <code>repo:tonzking123/dsolab:ref:refs/heads/main</code> and <code>repo:tonzking123/dsolab:pull_request</code></td><td>Update FIC subjects via Terraform or <code>az identity federated-credential update</code> to <code>repo:tonzking-lab/dsolab:...</code></td></tr>
+<tr><td><strong>Defender DevOps connector OAuth scope</strong></td><td>OAuth grant scoped to <code>tonzking123</code> org with explicit repo list (<code>dsolab</code>, <code>DevSecOps-Demo</code>)</td><td>Update grant via GitHub App settings to include <code>tonzking-lab</code> org + <code>dsolab</code> repo</td></tr>
+<tr><td><strong>Workflow file references to repo path</strong></td><td>Cosmetic — comments or error messages mention <code>tonzking123/dsolab</code></td><td>Search &amp; replace in <code>.github/workflows/*.yml</code> and <code>scripts/*.sh</code></td></tr>
+<tr><td>Branch protection rule on <code>main</code></td><td>Stays — it's per-repo</td><td>None</td></tr>
+<tr><td>Open PRs</td><td>Stay — PR numbers preserved</td><td>None</td></tr>
+<tr><td>Issue history</td><td>Stays — moves with the repo</td><td>None</td></tr>
+<tr><td>Dependabot config</td><td>Stays — <code>.github/dependabot.yml</code> moves with repo</td><td>None</td></tr>
+</table>
+
+<h3>Things that just keep working</h3>
+<ul>
+  <li>GitHub Actions workflows (after the OIDC FIC update)</li>
+  <li>All scan results (Trivy, Checkov, CodeQL) — they re-run on the new path and re-populate Security tab</li>
+  <li>ACR push (uses the same MI, which is Azure-side)</li>
+  <li>AKS deployment (uses the same <code>mi-n8n-aoai-dsolab</code> workload identity, no change)</li>
+  <li>Issue #17 (Checkov triage tracker)</li>
+  <li>All ADRs in <code>docs/decisions/</code></li>
+  <li>The chat at <code>https://chat.20.195.16.7.nip.io/</code> keeps running (it's all in AKS, not GitHub)</li>
+</ul>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2 id="decision">5. Decision matrix — should we do it?</h2>
+<table>
+<tr><th>Question</th><th>Answer</th></tr>
+<tr><td>Forced minimum seats for self-serve?</td><td>No (1 minimum)</td></tr>
+<tr><td>Forced minimum seats via Microsoft EA?</td><td>Yes (typically 25+)</td></tr>
+<tr><td>Worth buying for personal lab?</td><td><strong>No</strong> — $840/year for cosmetic badge + features only used during demo</td></tr>
+<tr><td>Worth a free 30-day trial?</td><td><strong>Yes — for the Phase 5 demo specifically</strong></td></tr>
+<tr><td>Will it hurt our Phase 5 if we don't have it?</td><td>You miss the MSEM "PR → image → pod → exploit" graph back-half, but you still get all the alerts. Lab pedagogy works without it.</td></tr>
+<tr><td>Should we migrate to org NOW?</td><td><strong>No</strong> — wait until 1-2 days before Phase 5 demo</td></tr>
+<tr><td>What can we fix WITHOUT GHAS today?</td><td>Container image mapping via Docker LABELs (Option 2 from §3.2) — closes one alignment gap for free</td></tr>
+</table>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2 id="next">6. Recommended next moves (independent of GHAS)</h2>
+
+<p>These improve our alignment WITHOUT touching the GHAS license:</p>
+
+<table>
+<tr><th>#</th><th>Action</th><th>Cost</th><th>Alignment win</th></tr>
+<tr><td>1</td><td>Add OCI LABELs to <code>spa/Dockerfile</code> (Option 2 from §3.2)</td><td>5 min</td><td>Container image mapping starts working</td></tr>
+<tr><td>2</td><td>Move SPA build to GitHub Actions (Phase 3.6 in lab plan)</td><td>1-2 hours</td><td>Container image mapping via Option 1 (auto) and Option 3 (attestation); also enables cosign signing for Phase 3.7 Ratify</td></tr>
+<tr><td>3</td><td>File ADR documenting the GHAS license deferral (this doc → ADR)</td><td>10 min</td><td>Provenance / audit trail</td></tr>
+<tr><td>4</td><td>File ADR documenting IaC template mapping as N/A (ADO-only)</td><td>5 min</td><td>Provenance</td></tr>
+<tr><td>5</td><td>(Optional, day-of) 30-day GHEC trial + org migration playbook above</td><td>1 hour setup + 30 min teardown</td><td>Full Defender-for-Cloud + GHAS story for Phase 5 demo</td></tr>
+</table>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2 id="questions">7. Open questions for the next chat</h2>
+
+<p>If you take this doc to a fresh chat to scope migration, here's what they should
+ask before doing anything destructive:</p>
+
+<div class="qbox">
+<h4>Q1. Are we migrating for keeps, or just for a demo?</h4>
+<p>The trial path vs the buy path have different recommendations and different teardown steps.</p>
+</div>
+
+<div class="qbox">
+<h4>Q2. Will <code>tonzking123</code> stay the only human owner?</h4>
+<p>Affects the active-committer count (and therefore cost) once on a paid plan. Each new committer = +$70/mo if GHAS is on.</p>
+</div>
+
+<div class="qbox">
+<h4>Q3. Do we want the org name to be something brandable?</h4>
+<p>(<code>devsecops-lab</code>, <code>acme-security-lab</code>) vs just <code>tonzking-lab</code>? Affects URLs, FIC subjects, and Defender connector references.</p>
+</div>
+
+<div class="qbox">
+<h4>Q4. Are we OK transferring all repos under <code>tonzking123</code>, or just <code>dsolab</code>?</h4>
+<p>Bulk transfer is simpler; partial means maintaining two contexts. <code>DevSecOps-Demo</code> is the obvious other candidate.</p>
+</div>
+
+<div class="qbox">
+<h4>Q5. Do we want to enforce SAML SSO / 2FA at org level?</h4>
+<p>Locks down nicely but adds friction for solo work. SSO requires identity-provider setup.</p>
+</div>
+
+<div class="qbox">
+<h4>Q6. Is the Azure connector <code>personal-github-repo</code> going to be renamed / re-grant scoped to the new org?</h4>
+<p>Affects the consent flow, the connector resource ID in <code>rg-cnapp-lab</code>, and any downstream Defender configuration.</p>
+</div>
+
+<div class="qbox">
+<h4>Q7. What's the rollback plan if Defender stops ingesting after migration?</h4>
+<p>OAuth re-grant + FIC update steps from §4. Worst case: transfer repo back, wait for connector to re-sync.</p>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2 id="refs">References</h2>
+<ul>
+  <li><a href="https://learn.microsoft.com/en-us/azure/defender-for-cloud/github-advanced-security-overview">GitHub Advanced Security overview (Defender for Cloud)</a></li>
+  <li><a href="https://learn.microsoft.com/en-us/azure/defender-for-cloud/container-image-mapping">Container image mapping</a></li>
+  <li><a href="https://learn.microsoft.com/en-us/azure/defender-for-cloud/iac-template-mapping">IaC template mapping</a></li>
+  <li><a href="https://github.com/enterprise/advanced-security">GitHub Advanced Security pricing &amp; SKUs</a></li>
+  <li><a href="https://github.com/security/plans">GitHub Enterprise Cloud plan comparison</a></li>
+  <li><a href="https://azuremarketplace.microsoft.com/marketplace/apps/github.advanced-security">Azure Marketplace — GitHub Advanced Security</a></li>
+</ul>
+
+<p class="subtitle" style="margin-top: 30px; text-align: center;">
+Generated 2026-05-24 as a hand-off doc for migration scoping.
+Pair with <code>plan.md</code>, <code>phase2.html</code>, and <code>demo.html</code>.
+</p>
+
+</body>
+</html>
