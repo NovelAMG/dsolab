@@ -30,7 +30,7 @@ set -euo pipefail
 
 PREFIX="${PREFIX:-dsolab}"
 RG_NAME="${RG_NAME:-rg-${PREFIX}-sea}"
-GH_REPO="${GH_REPO:-tonzking123/dsolab}"
+GH_REPO="${GH_REPO:-NovelAMG/dsolab}"
 ACR_NAME="${ACR_NAME:-}"
 INGRESS_HOST="${INGRESS_HOST:-}"
 

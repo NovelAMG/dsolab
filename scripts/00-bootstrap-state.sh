@@ -14,7 +14,7 @@ set -euo pipefail
 # ---------- Config ----------
 PREFIX="${PREFIX:-dsolab}"
 LOCATION_PRIMARY="${LOCATION_PRIMARY:-southeastasia}"
-GH_REPO="${GH_REPO:-tonzking123/dsolab}"
+GH_REPO="${GH_REPO:-NovelAMG/dsolab}"
 
 RG_NAME="rg-${PREFIX}-sea"
 MI_NAME="mi-gha-${PREFIX}"

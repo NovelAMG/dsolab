@@ -26,7 +26,7 @@
 ## Prerequisites
 
 - [ ] Phase 1A merged on `main` (workflow `Hello World (OIDC smoke test)` is green)
-- [ ] `gh variable list --repo tonzking123/dsolab` shows 7 variables
+- [ ] `gh variable list --repo NovelAMG/dsolab` shows 7 variables
 - [ ] Your $200/mo budget alert is set in Azure Cost Management
 - [ ] **One-time: register Azure Resource Providers** (your account, not CI):
   ```bash
@@ -64,10 +64,10 @@ brew install terraform
 terraform -chdir=terraform/envs/lab fmt -check -recursive ../.. && echo "✓ fmt clean"
 
 terraform -chdir=terraform/envs/lab init \
-  -backend-config="resource_group_name=$(gh variable get TF_STATE_RG --repo tonzking123/dsolab)" \
-  -backend-config="storage_account_name=$(gh variable get TF_STATE_SA --repo tonzking123/dsolab)" \
-  -backend-config="container_name=$(gh variable get TF_STATE_CONTAINER --repo tonzking123/dsolab)" \
-  -backend-config="key=$(gh variable get TF_STATE_KEY --repo tonzking123/dsolab)"
+  -backend-config="resource_group_name=$(gh variable get TF_STATE_RG --repo NovelAMG/dsolab)" \
+  -backend-config="storage_account_name=$(gh variable get TF_STATE_SA --repo NovelAMG/dsolab)" \
+  -backend-config="container_name=$(gh variable get TF_STATE_CONTAINER --repo NovelAMG/dsolab)" \
+  -backend-config="key=$(gh variable get TF_STATE_KEY --repo NovelAMG/dsolab)"
 
 terraform -chdir=terraform/envs/lab validate
 ```
@@ -216,7 +216,7 @@ kubectl get pods -A | grep -i defender || echo "✓ no defender pods (correct fo
 | Postgres apply fails: "ResourceQuotaExceeded" | Burstable family quota | Quotas → Postgres Flexible Servers → request increase |
 | `kubectl get nodes` after apply: "No connection" | `az aks get-credentials` not run yet | Run the command in Step 7 |
 | `az postgres ad-admin create` fails: `'ad-admin' is misspelled` | azure-cli ≥ 2.70 renamed the subcommand | Use `az postgres flexible-server microsoft-entra-admin create ...` (see Step 8) |
-| KV access denied (`ForbiddenByRbac`) on `az keyvault secret list` after a CI-run apply | The `data.azurerm_client_config.current.object_id` in CI resolves to the GHA MI, not you. Without the `HUMAN_ADMIN_OID` GitHub variable set, only the MI got KV Administrator. | Set the variable: `gh variable set HUMAN_ADMIN_OID --body $(az ad signed-in-user show --query id -o tsv) --repo tonzking123/dsolab`, then re-run `terraform apply` (or grant yourself manually: `az role assignment create --assignee-object-id $(az ad signed-in-user show --query id -o tsv) --role 'Key Vault Administrator' --scope $(az keyvault show -n <kv-name> --query id -o tsv)`) |
+| KV access denied (`ForbiddenByRbac`) on `az keyvault secret list` after a CI-run apply | The `data.azurerm_client_config.current.object_id` in CI resolves to the GHA MI, not you. Without the `HUMAN_ADMIN_OID` GitHub variable set, only the MI got KV Administrator. | Set the variable: `gh variable set HUMAN_ADMIN_OID --body $(az ad signed-in-user show --query id -o tsv) --repo NovelAMG/dsolab`, then re-run `terraform apply` (or grant yourself manually: `az role assignment create --assignee-object-id $(az ad signed-in-user show --query id -o tsv) --role 'Key Vault Administrator' --scope $(az keyvault show -n <kv-name> --query id -o tsv)`) |
 
 ## What's next
 

@@ -18,7 +18,7 @@ End-to-end DevSecOps learning lab on Azure: SPA + n8n + Azure OpenAI on AKS, sec
 | AKS region | `southeastasia` |
 | Azure OpenAI region | `australiaeast` (split for GPT-4o availability) |
 | Naming prefix | `dsolab` |
-| GitHub repo | `tonzking123/dsolab` |
+| GitHub repo | `NovelAMG/dsolab` |
 | Lab FQDN | `chat.<ingress-IP>.nip.io` (no DNS to manage) |
 
 ## Prerequisites
@@ -29,7 +29,7 @@ Before running the bootstrap script:
 2. **Azure CLI** (`az`) ≥ 2.60, logged in (`az login`).
 3. **GitHub CLI** (`gh`), logged in (`gh auth login`) with `repo` scope.
 4. **Terraform** ≥ 1.6.
-5. The empty repo `tonzking123/dsolab` exists on GitHub.
+5. The empty repo `NovelAMG/dsolab` exists on GitHub.
 
 ## Phase 1A — quick start
 

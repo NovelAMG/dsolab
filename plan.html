@@ -151,8 +151,8 @@ hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
 <tbody>
 <tr><td>AKS region</td><td><code>southeastasia</code></td></tr>
 <tr><td>AOAI region</td><td><code>australiaeast</code> (split for GPT-4o availability)</td></tr>
-<tr><td>GitHub repo</td><td><code>tonzking123/dsolab</code></td></tr>
-<tr><td>OIDC FIC subjects</td><td><code>repo:tonzking123/dsolab:ref:refs/heads/main</code> and <code>repo:tonzking123/dsolab:pull_request</code></td></tr>
+<tr><td>GitHub repo</td><td><code>NovelAMG/dsolab</code></td></tr>
+<tr><td>OIDC FIC subjects</td><td><code>repo:NovelAMG/dsolab:ref:refs/heads/main</code> and <code>repo:NovelAMG/dsolab:pull_request</code></td></tr>
 <tr><td>Naming prefix</td><td><code>dsolab</code></td></tr>
 <tr><td>Resource group</td><td><code>rg-dsolab-sea</code></td></tr>
 <tr><td>AKS cluster</td><td><code>aks-dsolab-sea</code></td></tr>
@@ -409,7 +409,7 @@ flowchart LR
 <tr><td>3.3</td><td>Runtime sensor on AKS</td><td>✅ done (AKS add-on)</td><td>8 Defender pods in <code>kube-system</code>. ADR 0001 deferral ended.</td></tr>
 <tr><td>3.4</td><td>NetworkPolicy default-deny in <code>n8n</code> ns</td><td>⏸️ deferred</td><td>Will revisit; low priority for solo lab</td></tr>
 <tr><td>3.5</td><td>Key Vault CSI</td><td>⏸️ deferred</td><td>Same</td></tr>
-<tr><td><strong>3.6</strong></td><td><strong>Cosign signing in CI</strong> (build-time attestation)</td><td>✅ done 2026-05-24</td><td>PR #32. First signed image: <code>dsolab/spa:be79d39</code> + signature <code>sha256-006f....sig</code>. Identity: <code>repo:tonzking123/dsolab:ref:refs/heads/main</code> via GitHub OIDC keyless. ADR 0017.</td></tr>
+<tr><td><strong>3.6</strong></td><td><strong>Cosign signing in CI</strong> (build-time attestation)</td><td>✅ done 2026-05-24</td><td>PR #32. First signed image: <code>dsolab/spa:be79d39</code> + signature <code>sha256-006f....sig</code>. Identity: <code>repo:NovelAMG/dsolab:ref:refs/heads/main</code> via GitHub OIDC keyless. ADR 0017.</td></tr>
 <tr><td><strong>3.7</strong></td><td><strong>Defender Image Integrity</strong> (gated deployment on signature + CVE)</td><td>⏳ NEXT</td><td>Now has signatures to verify. ADR 0016</td></tr>
 <tr><td>3.8</td><td>Switch Defender sensor add-on → Helm</td><td>🔜 later</td><td>Unlocks Antimalware + Binary drift <strong>blocking</strong> (preview); plan before Phase 5 detonation</td></tr>
 <tr><td>3.9</td><td>Ingress hardening (AFD/WAF, AOAI private endpoint)</td><td>🔜 later</td><td>Was 3.3 in original numbering</td></tr>
@@ -457,7 +457,7 @@ flowchart LR
 <p>First signed image: <code>acrdsolabxsqb.azurecr.io/dsolab/spa:be79d39</code><br>Signature artifact: <code>sha256-006f529f3ac1f821a11df76c54870f110aa957b00e4832e4bf98c0ec4b04e175.sig</code></p>
 <p><strong>Verify from any machine:</strong></p>
 <pre><code>cosign verify \
-  --certificate-identity-regexp 'https://github.com/tonzking123/dsolab/.github/workflows/build-spa.yml.*' \
+  --certificate-identity-regexp 'https://github.com/NovelAMG/dsolab/.github/workflows/build-spa.yml.*' \
   --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
   acrdsolabxsqb.azurecr.io/dsolab/spa:latest</code></pre>
 <p><span class="label label-gotcha">Note</span> <code>scripts/08-build-and-push-spa.sh</code> now banner-marked DEV-ITERATION ONLY. Unsigned local builds will be REJECTED by 3.7's admission once on — by design (ADR 0017).</p>

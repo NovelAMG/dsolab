@@ -22,8 +22,8 @@ Phased learning lab that takes a security engineer from "no DevOps" to a fully i
 |---|---|
 | AKS region | `southeastasia` |
 | AOAI region | `australiaeast` (split for GPT-4o availability) |
-| GitHub repo | `tonzking123/dsolab` |
-| OIDC FIC subjects | `repo:tonzking123/dsolab:ref:refs/heads/main` and `repo:tonzking123/dsolab:pull_request` |
+| GitHub repo | `NovelAMG/dsolab` |
+| OIDC FIC subjects | `repo:NovelAMG/dsolab:ref:refs/heads/main` and `repo:NovelAMG/dsolab:pull_request` |
 | Naming prefix | `dsolab` |
 | Resource group | `rg-dsolab-sea` |
 | AKS cluster | `aks-dsolab-sea` |
@@ -256,7 +256,7 @@ Goal: defense-in-depth at the cluster layer. Even a malicious image that slips p
 > | 3.3 | Runtime sensor on AKS | ✅ done (AKS add-on) | 8 Defender pods running in `kube-system`. ADR 0001 deferral ended. |
 > | 3.4 | NetworkPolicy default-deny in `n8n` ns | ⏸️ deferred | Will revisit; low priority for solo lab without lateral-movement risk yet |
 > | 3.5 | Key Vault CSI — secrets out of K8s | ⏸️ deferred | Same |
-> | **3.6** | **Cosign signing in CI** (build-time attestation) | ✅ done 2026-05-24 | PR #32. First signed image: `dsolab/spa:be79d39` + signature artifact `sha256-006f....sig` in ACR. Identity: `repo:tonzking123/dsolab:ref:refs/heads/main` via GitHub OIDC keyless. ADR 0017 documents the build-in-CI-not-laptop decision. |
+> | **3.6** | **Cosign signing in CI** (build-time attestation) | ✅ done 2026-05-24 | PR #32. First signed image: `dsolab/spa:be79d39` + signature artifact `sha256-006f....sig` in ACR. Identity: `repo:NovelAMG/dsolab:ref:refs/heads/main` via GitHub OIDC keyless. ADR 0017 documents the build-in-CI-not-laptop decision. |
 > | **3.7** | **Defender Image Integrity** (gated deployment on signature + CVE) | ⏳ NEXT | Now has signatures to verify. ADR 0016 |
 > | 3.8 | Switch Defender sensor add-on → Helm | 🔜 later | Required to unlock Antimalware + Binary drift **blocking** (preview); plan before Phase 5 detonation |
 > | 3.9 | Ingress hardening (AFD/WAF, AOAI private endpoint) | 🔜 later | Was 3.3 in original numbering; renumbered to avoid confusion |
@@ -294,7 +294,7 @@ Goal: defense-in-depth at the cluster layer. Even a malicious image that slips p
 - Verify from any machine:
   ```bash
   cosign verify \
-    --certificate-identity-regexp 'https://github.com/tonzking123/dsolab/.github/workflows/build-spa.yml.*' \
+    --certificate-identity-regexp 'https://github.com/NovelAMG/dsolab/.github/workflows/build-spa.yml.*' \
     --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
     acrdsolabxsqb.azurecr.io/dsolab/spa:latest
   ```
@@ -306,7 +306,7 @@ Goal: defense-in-depth at the cluster layer. Even a malicious image that slips p
 - **Where configured**:
 >   - **Portal**: Defender for Cloud → Workload protections → Image Integrity (preview) → enable for `aks-dsolab-sea`. Microsoft auto-deploys Ratify in `gatekeeper-system`.
 >   - **Or CLI**: `az aks update --name aks-dsolab-sea --enable-image-integrity`
->   - **Code (PR)**: Azure Policy assignment (custom or built-in) scoped to namespace `n8n` only. Allow images signed by `repo:tonzking123/dsolab:*` AND with no Critical CVE.
+>   - **Code (PR)**: Azure Policy assignment (custom or built-in) scoped to namespace `n8n` only. Allow images signed by `repo:NovelAMG/dsolab:*` AND with no Critical CVE.
 - **Risk**: HIGH if scoped cluster-wide. Always start at namespace scope. Keep `kube-system` and `gatekeeper-system` excluded.
 - **Verify**:
 >   1. Negative: `kubectl run x --image=nginx -n n8n` → REJECTED ("image not signed")
@@ -462,7 +462,7 @@ Goal: prove the stack catches a real recent RCE end-to-end. **Quantify which lay
 - **0014** — n8n Code-node vm2 sandbox quirks (`require`, `process.env`, `URLSearchParams`)
 - **0015** — Phase 2 supply-chain gates (CodeQL + Trivy + Checkov + Dependabot; Defender substitutions explained)
 - **0016** — Use Defender for Cloud Image Integrity instead of raw Ratify for the 3.7 admission gate (Microsoft-managed Ratify; single Azure Policy syntax; gates on BOTH signature AND vulnerability findings)
-- **0017** — SPA build+push+sign runs in CI, not from a laptop (signing identity = `repo:tonzking123/dsolab:ref:refs/heads/main` GitHub OIDC subject; required for 3.7 Image Integrity policy to trust a stable, non-human identity)
+- **0017** — SPA build+push+sign runs in CI, not from a laptop (signing identity = `repo:NovelAMG/dsolab:ref:refs/heads/main` GitHub OIDC subject; required for 3.7 Image Integrity policy to trust a stable, non-human identity)
 
 ### Operational state captured (out-of-band changes, not yet in dedicated ADRs)
 - **Dependabot security updates**: enabled via `gh api PUT repos/.../automated-security-fixes` (not expressible as a repo file)

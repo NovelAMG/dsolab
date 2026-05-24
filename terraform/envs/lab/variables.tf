@@ -25,7 +25,7 @@ variable "resource_group_name" {
 variable "github_repo" {
   description = "GitHub org/repo for OIDC federated credential subjects"
   type        = string
-  default     = "tonzking123/dsolab"
+  default     = "NovelAMG/dsolab"
 }
 
 variable "tags" {
