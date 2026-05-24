@@ -18,6 +18,11 @@ resource "azurerm_kubernetes_cluster" "this" {
     type                         = "VirtualMachineScaleSets"
     only_critical_addons_enabled = false # lab: workload pods run here for now
     os_disk_size_gb              = 30
+    # Required by AzureRM ~> 4.0 for in-place vm_size changes on the default
+    # pool: AKS spins up a parallel pool with this name using the new SKU,
+    # cordon+drains the old pool, then promotes the new one. Without this
+    # field a vm_size change would force cluster recreation. See ADR-0018.
+    temporary_name_for_rotation = "systmp"
     upgrade_settings {
       max_surge = "10%"
     }

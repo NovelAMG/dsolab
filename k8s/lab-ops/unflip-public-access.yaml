@@ -1,0 +1,115 @@
+# Stop-gap workaround for MCAPSGov-AutomationApp (Microsoft corporate FDPO governance).
+#
+# That SP (appId eadea216-1d5c-4a4b-beaf-4f145e6b1cb4, owned by Microsoft corp
+# tenant 72f988bf-86f1-41af-91ab-2d7cd011db47) runs daily ~17:37 UTC against
+# subs under management group b676efda-5e5b-43d3-893e-4ed357b457c4 and PATCHes
+# Storage / Key Vault to set publicNetworkAccess=Disabled (direct ARM call,
+# bypassing Azure Policy — exemptions don't help).
+#
+# This CronJob fires at 18:05 UTC (28 min after the sweep) and flips them back
+# so the lab keeps working. See ADR-0018 for the design and Phase 3.9 for the
+# permanent fix (private endpoints + self-hosted GHA runner in VNet).
+#
+# Identity: mi-lab-unflip (UAMI) federated to SA lab-ops/lab-unflip, with
+# Contributor scoped ONLY to the 2 target resources.
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: lab-ops
+  labels:
+    purpose: lab-operations
+    azure.workload.identity/use: "true"
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: lab-unflip
+  namespace: lab-ops
+  annotations:
+    # clientId of mi-lab-unflip
+    azure.workload.identity/client-id: "cbb571b1-01eb-4bf4-abce-0ea1d2aa8d65"
+    azure.workload.identity/tenant-id: "b676efda-5e5b-43d3-893e-4ed357b457c4"
+  labels:
+    azure.workload.identity/use: "true"
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: unflip-public-access
+  namespace: lab-ops
+spec:
+  # 18:05 UTC daily — MCAPSGov sweep is ~17:37 UTC.
+  schedule: "5 18 * * *"
+  timeZone: "Etc/UTC"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            app: unflip-public-access
+            azure.workload.identity/use: "true"
+        spec:
+          serviceAccountName: lab-unflip
+          enableServiceLinks: false
+          restartPolicy: OnFailure
+          containers:
+            - name: az
+              image: mcr.microsoft.com/azure-cli:2.69.0
+              imagePullPolicy: IfNotPresent
+              resources:
+                requests:
+                  cpu: "50m"
+                  memory: "128Mi"
+                limits:
+                  cpu: "500m"
+                  memory: "512Mi"
+              securityContext:
+                allowPrivilegeEscalation: false
+                runAsNonRoot: true
+                runAsUser: 1000
+                capabilities:
+                  drop: ["ALL"]
+                seccompProfile:
+                  type: RuntimeDefault
+                readOnlyRootFilesystem: true
+              env:
+                - name: AZURE_CONFIG_DIR
+                  value: /tmp/.azure
+                - name: HOME
+                  value: /tmp
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  set -eu
+                  echo "[unflip] login via workload identity (FIC)..."
+                  az login --service-principal \
+                    -u "${AZURE_CLIENT_ID}" \
+                    -t "${AZURE_TENANT_ID}" \
+                    --federated-token "$(cat ${AZURE_FEDERATED_TOKEN_FILE})" \
+                    --output none
+                  echo "[unflip] account:"
+                  az account show --query "{sub:id, user:user.name}" -o table
+                  echo "[unflip] re-enable Storage publicNetworkAccess..."
+                  az storage account update \
+                    -n stdsolabtfstate1db4 -g rg-dsolab-sea \
+                    --public-network-access Enabled \
+                    --query "{name:name, pna:publicNetworkAccess}" -o table
+                  echo "[unflip] re-enable Key Vault publicNetworkAccess..."
+                  az keyvault update \
+                    -n kv-dsolab-sea-xsqb -g rg-dsolab-sea \
+                    --public-network-access Enabled \
+                    --query "{name:name, pna:properties.publicNetworkAccess}" -o table
+                  echo "[unflip] done."
+          volumes:
+            - name: tmp
+              emptyDir:
+                sizeLimit: 64Mi

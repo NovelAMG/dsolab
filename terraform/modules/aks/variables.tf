@@ -20,9 +20,13 @@ variable "system_node_count" {
 }
 
 variable "system_node_vm_size" {
-  description = "VM size for system node pool (Burstable B2s ≈ $30/mo each in SEA)"
+  # B4als_v2 = 4 vCPU / 8 GiB AMD burstable, ~$0.06/hr in SEA.
+  # Upgraded from B2s (2 vCPU / 4 GiB) in ADR-0018 to fit Defender sensor +
+  # anti-malware daemonset + Image Integrity headroom. AMD burstable is the
+  # cheapest tier that gives enough RAM for the 3.7+ phase stack.
+  description = "VM size for system node pool"
   type        = string
-  default     = "Standard_B2s"
+  default     = "Standard_B4als_v2"
 }
 
 variable "acr_id" {
