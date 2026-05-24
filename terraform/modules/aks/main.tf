@@ -8,8 +8,10 @@ resource "azurerm_kubernetes_cluster" "this" {
   workload_identity_enabled = true
   oidc_issuer_enabled       = true
 
-  # We disabled the Azure Policy add-on in Phase 1C via Defender settings; keep it off here.
-  azure_policy_enabled = false
+  # Azure Policy add-on (Gatekeeper). Originally disabled in Phase 1C
+  # (ADR-0001) but CSPM re-enables it anyway, and Phase 3.7 Image Integrity
+  # uses it as the enforcement engine. Source of truth flipped in ADR-0018.
+  azure_policy_enabled = true
 
   default_node_pool {
     name                         = "system"
@@ -18,6 +20,11 @@ resource "azurerm_kubernetes_cluster" "this" {
     type                         = "VirtualMachineScaleSets"
     only_critical_addons_enabled = false # lab: workload pods run here for now
     os_disk_size_gb              = 30
+    # Required by AzureRM ~> 4.0 for in-place vm_size changes on the default
+    # pool: AKS spins up a parallel pool with this name using the new SKU,
+    # cordon+drains the old pool, then promotes the new one. Without this
+    # field a vm_size change would force cluster recreation. See ADR-0018.
+    temporary_name_for_rotation = "systmp"
     upgrade_settings {
       max_surge = "10%"
     }
@@ -48,6 +55,10 @@ resource "azurerm_kubernetes_cluster" "this" {
   lifecycle {
     ignore_changes = [
       default_node_pool[0].node_count, # autoscaler-friendly
+      # microsoft_defender is enabled/disabled out-of-band via
+      # `az aks update --enable-defender` (Phase 3.3) so the workspace
+      # association is managed there, not in TF. See ADR-0018.
+      microsoft_defender,
     ]
   }
 }
