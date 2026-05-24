@@ -1,6 +1,19 @@
 #!/usr/bin/env bash
 # Phase 1E-d — build the SPA image and push to ACR.
 #
+# ┌─────────────────────────────────────────────────────────────────────┐
+# │  DEV-ITERATION ONLY since Phase 3.6 (2026-05-24).                   │
+# │                                                                     │
+# │  Production builds run in CI via .github/workflows/build-spa.yml    │
+# │  on every push to main that touches spa/**. Those images are signed │
+# │  with GitHub OIDC and will be the only ones Defender Image          │
+# │  Integrity (Phase 3.7) admits to the n8n namespace.                 │
+# │                                                                     │
+# │  Use this script for fast feedback while developing. Images pushed  │
+# │  by this script are NOT signed and will be REJECTED by admission    │
+# │  once 3.7 is on — that's by design. See ADR 0017.                   │
+# └─────────────────────────────────────────────────────────────────────┘
+#
 # Also adds the production redirect URI to the SPA app reg if missing.
 #
 # What this does:
