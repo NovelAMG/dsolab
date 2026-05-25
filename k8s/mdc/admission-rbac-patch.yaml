@@ -1,0 +1,85 @@
+# Defender admission controller — RBAC bug fix.
+#
+# The microsoft-defender-for-containers chart (extracted from cnapp-lab,
+# applied to dsolab in ADR-0020) ships a ClusterRole
+# `defender-admission-controller-cluster-role` that grants the controller
+# access to webhook configs, ratify CRDs, etc. — but it OMITS list/watch
+# permissions on the very resources the controller is supposed to enforce:
+#
+#   - securityartifactpolicies.defender.microsoft.com  (the policy CR)
+#   - antimalwarepolicies.defender.microsoft.com       (drift block CR)
+#   - runtimepolicies.defender.microsoft.com           (runtime CR)
+#   - policies.defender.microsoft.com                  (generic CR)
+#
+# Without these, controller-runtime's informer cache fails to sync, the
+# controller logs `cannot list resource securityartifactpolicies ...
+# forbidden` continuously, and the cached policy version (whatever was
+# read once at startup via direct GET) becomes permanently stale. Concrete
+# symptom: we flipped mdc-vulnerability-assessment-policy from `audit` to
+# `deny`, controller log line still showed `verify config action: audit`,
+# negative test passed (allowed).
+#
+# Same chart bug was the latent cause of the cnapp-lab 4-day crash loop
+# we fixed in ADR-0020: failurePolicy: Ignore on the webhook masked the
+# broken controller for 4 days.
+#
+# This file patches the chart's RBAC additively (we don't touch the chart
+# ClusterRole because the chart reconciler would revert any edit). New
+# ClusterRole `defender-admission-controller-defender-crds-reader` is
+# bound to the existing chart SA.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: defender-admission-controller-defender-crds-reader
+  labels:
+    app.kubernetes.io/name: defender-admission-controller
+    app: defender-admission-controller
+    dsolab.patch/reason: chart-rbac-gap-adr-0022
+rules:
+  # Watch all four defender.microsoft.com policy CRDs the controller
+  # needs to reconcile against.
+  - apiGroups:
+      - defender.microsoft.com
+    resources:
+      - securityartifactpolicies
+      - antimalwarepolicies
+      - runtimepolicies
+      - policies
+    verbs:
+      - get
+      - list
+      - watch
+  # Belt-and-suspenders: the chart's existing role does grant
+  # validatingwebhookconfigurations get/list/watch, but the cluster
+  # observably still rejects the request — possibly because of the
+  # weird second rule with resourceNames hard-coded to the kube-system
+  # webhook name. Granting again here so the union resolves to allowed.
+  # Also need UPDATE for the cert-rotator (open-policy-agent/cert-controller)
+  # to write the CA bundle into the webhook config on cert rotation.
+  - apiGroups:
+      - admissionregistration.k8s.io
+    resources:
+      - validatingwebhookconfigurations
+    verbs:
+      - get
+      - list
+      - watch
+      - update
+      - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: defender-admission-controller-defender-crds-reader-binding
+  labels:
+    app.kubernetes.io/name: defender-admission-controller
+    app: defender-admission-controller
+    dsolab.patch/reason: chart-rbac-gap-adr-0022
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: defender-admission-controller-defender-crds-reader
+subjects:
+  - kind: ServiceAccount
+    name: defender-admission-controller-serviceaccount
+    namespace: mdc
