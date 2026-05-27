@@ -73,6 +73,8 @@ jobs:
           SHA_SHORT="${GITHUB_SHA::7}"
           echo "tag=${ACR_LOGIN_SERVER}/${IMAGE_REPO}:${SHA_SHORT}" >> "$GITHUB_OUTPUT"
           echo "sha_short=${SHA_SHORT}" >> "$GITHUB_OUTPUT"
+          # ISO-8601 UTC timestamp for OCI image label org.opencontainers.image.created
+          echo "build_date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
       - name: Build + push
         id: push
@@ -89,11 +91,15 @@ jobs:
           # Build args match the local script. Vite bakes these into the bundle
           # at build time — they end up in the JS the browser downloads, so
           # they're not secrets, they're public configuration.
+          # GITHUB_SHA + BUILD_DATE feed OCI labels for Defender container-to-source
+          # mapping (see Dockerfile + Doc: container-image-mapping).
           build-args: |
             VITE_SPA_CLIENT_ID=${{ vars.SPA_APP_ID }}
             VITE_TENANT_ID=${{ vars.AZURE_TENANT_ID }}
             VITE_N8N_API_SCOPE=${{ vars.N8N_API_APP_URI }}/access_as_user
             VITE_REDIRECT_URI=https://${{ vars.INGRESS_HOST }}/auth/callback
+            GITHUB_SHA=${{ github.sha }}
+            BUILD_DATE=${{ steps.tag.outputs.build_date }}
 
       - name: Install cosign
         uses: sigstore/cosign-installer@v3
