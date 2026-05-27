@@ -1,0 +1,78 @@
+# Defender for Containers — vulnerability-gated admission control.
+#
+# Pivots Phase 3.7 from "Image Integrity signed-image enforcement" (which on
+# AKS-managed Ratify is notation-only — see ADR-0021 / ADR-0022) to
+# "vulnerability gate". Uses the same Defender admission controller webhook
+# (defender-admission-controller.mdc.svc) that's already in place; the
+# enforcement engine is Defender for Cloud's CVE scan results for each image
+# in our ACR.
+#
+# How it works:
+#   1. Pod CREATE/UPDATE hits the validating webhook.
+#   2. For each container image, defender-admission-controller looks up the
+#      most recent Microsoft Defender Vulnerability Assessment (MDVA) report.
+#   3. If the image is in `unsupportedRegistries` (third-party registries
+#      that MDVA cannot scan) it auto-passes.
+#   4. If the image has been scanned and has more critical CVEs than
+#      `maxAllowedSeverities.critical`, the pod is REJECTED.
+#   5. If the image hasn't been scanned and `blockUnscannedImages: true`,
+#      the pod is REJECTED.
+#
+# Why we expand unsupportedRegistries vs the cnapp-lab default:
+#   Our cluster runs cert-manager (quay.io/jetstack), oauth2-proxy
+#   (quay.io/oauth2-proxy), n8n (docker.n8n.io/n8nio), and ingress-nginx
+#   (registry.k8s.io/ingress-nginx). MDVA can't scan any of these. Without
+#   exempting their registries, flipping action: deny would block all of
+#   them at the next pod recreation — broken cluster.
+#
+# Why blockUnscannedImages stays false:
+#   With deny + blockUnscannedImages: true we'd reject any image MDVA hasn't
+#   scanned yet, including freshly-pushed images during a deploy. Lab
+#   accepts this trade-off — gate on positive scan results only.
+#
+# This CR was auto-created by Defender for Cloud on 2026-05-24 13:32 UTC
+# with audit mode. We're overwriting it with kubectl apply; no Helm/Microsoft
+# reconciler claims ownership (no `app.kubernetes.io/managed-by` label, no
+# `kubernetes.azure.com/managedby` label — verified via kubectl get -o yaml).
+apiVersion: defender.microsoft.com/v1alpha3
+kind: SecurityArtifactPolicy
+metadata:
+  name: mdc-vulnerability-assessment-policy
+spec:
+  policyLastEditTime: "2026-05-25T14:00:00Z"
+  vulnerabilityAssessmentGatedDeployment:
+    - name: dsolab-critical-cve-block
+      action: deny
+      configuration:
+        # Zero critical CVEs allowed in any scanned image.
+        maxAllowedSeverities:
+          critical: 0
+        # Stale scan threshold — older scans no longer count.
+        maximumVaFileAge: 365d
+        # Lab posture: don't block images MDVA hasn't scanned yet. Production
+        # would flip this to `true` to force "every image must have a scan".
+        blockUnscannedImages: false
+        # Registries Defender for Cloud cannot scan. Anything in this list
+        # gets a free pass at admission (no scan = no CVE finding = nothing
+        # to deny on).
+        unsupportedRegistries:
+          # Original defaults from the cnapp-lab system rule:
+          - mcr.microsoft.com
+          - docker.io
+          - public.ecr.aws
+          - gcr.io
+          - jfrog.io
+          # dsolab-specific additions for the 3rd-party images we run:
+          - docker.n8n.io       # n8n upstream image
+          - quay.io             # cert-manager, oauth2-proxy
+          - registry.k8s.io     # ingress-nginx official
+          - ghcr.io             # frequently used; future-proofing
+        # No image-level exemptions. Add later as needed:
+        #   exemptions:
+        #     - type: image
+        #       value: "acrdsolabxsqb.azurecr.io/dsolab/legacy:v1"
+        exemptions: []
+        # No explicit forbidden/ignored CVE lists; deny is driven purely by
+        # severity threshold + scan status.
+        forbiddenCves: []
+        ignoredCves: []
