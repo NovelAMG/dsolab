@@ -33,6 +33,21 @@ RUN npm run build
 # ── Stage 2: serve ─────────────────────────────────────────
 FROM nginx:alpine AS runtime
 
+# OCI image annotations — read by Defender for Cloud's container-to-source
+# mapping (https://learn.microsoft.com/azure/defender-for-cloud/container-image-mapping).
+# Without these the image-to-repo link doesn't appear in DevOps security and
+# code-to-runtime CVE recommendations can't be tied back to NovelAMG/dsolab.
+# Cosign signatures alone do NOT feed this mapping — it reads OCI labels.
+ARG GITHUB_SHA
+ARG BUILD_DATE
+LABEL org.opencontainers.image.source="https://github.com/NovelAMG/dsolab"
+LABEL org.opencontainers.image.url="https://github.com/NovelAMG/dsolab"
+LABEL org.opencontainers.image.title="dsolab/spa"
+LABEL org.opencontainers.image.description="DSO lab SPA — Vite/React front-end with MSAL"
+LABEL org.opencontainers.image.licenses="MIT"
+LABEL org.opencontainers.image.revision="${GITHUB_SHA}"
+LABEL org.opencontainers.image.created="${BUILD_DATE}"
+
 # nginx-default config doesn't do SPA fallback. Replace it.
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
