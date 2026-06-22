@@ -101,6 +101,23 @@ jobs:
             GITHUB_SHA=${{ github.sha }}
             BUILD_DATE=${{ steps.tag.outputs.build_date }}
 
+      # ── Defender for Cloud CLI — MDVM container image scan ──────
+      # Same CVE database as the in-cluster SecurityArtifactPolicy admission
+      # gate. Results upload to Defender for Cloud → DevOps Security blade →
+      # populates the "Build" phase in the development phases diagram.
+      # Non-blocking (continue-on-error) — Trivy gate already blocks on
+      # HIGH/CRITICAL in trivy-image.yml. This is purely for Defender visibility.
+      - name: Download Defender for Cloud CLI
+        run: curl -sL -o defender "https://aka.ms/defender-cli_linux-x64" && chmod +x defender
+
+      - name: Defender CLI — scan image (MDVM)
+        continue-on-error: true
+        env:
+          DEFENDER_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          DEFENDER_CLIENT_ID: ${{ secrets.DEFENDER_CLIENT_ID }}
+          DEFENDER_CLIENT_SECRET: ${{ secrets.DEFENDER_CLIENT_SECRET }}
+        run: ./defender scan image '${{ steps.tag.outputs.tag }}'
+
       - name: Install cosign
         uses: sigstore/cosign-installer@v3
         with:
