@@ -31,7 +31,10 @@ COPY . .
 RUN npm run build
 
 # ── Stage 2: serve ─────────────────────────────────────────
-FROM nginx:alpine AS runtime
+# LAB: pinned to nginx:1.24-alpine (EOL, multiple HIGH CVEs — CVE-2024-7347 etc.)
+# to produce MDVM findings for code-to-cloud mapping in Defender for Cloud.
+# This is intentional for lab purposes; not for production use.
+FROM nginx:1.24-alpine AS runtime
 
 # OCI image annotations — read by Defender for Cloud's container-to-source
 # mapping (https://learn.microsoft.com/azure/defender-for-cloud/container-image-mapping).
