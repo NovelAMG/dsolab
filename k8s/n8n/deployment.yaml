@@ -55,7 +55,10 @@ spec:
         runAsNonRoot: true
       containers:
         - name: n8n
-          image: docker.n8n.io/n8nio/n8n:1.69.0
+          # Rehosted from docker.n8n.io through .github/workflows/build-mirror-images.yml
+          # so Defender for Cloud can attribute Code/Build/Ship, not just Runtime.
+          # See containers/n8n/Dockerfile.
+          image: acrdsolabxsqb.azurecr.io/dsolab/n8n:1.69.0
           imagePullPolicy: IfNotPresent
           ports:
             - name: http

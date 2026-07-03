@@ -1,0 +1,169 @@
+# Rehost upstream third-party images (n8n, oauth2-proxy) into our own ACR.
+#
+# Why: Defender for Cloud can only scan/attribute images that live in a
+# registry it has access to (ours) and that were produced by a pipeline it
+# knows about (this one). Images pulled straight from docker.n8n.io / quay.io
+# get Runtime detection only — no Code/Build/Ship legs, and a permanent
+# "Turn on registry access" badge. Rehosting through this workflow gives
+# n8n and oauth2-proxy the same Code→Build→Ship→Runtime treatment the spa
+# image already has. See containers/*/Dockerfile for details.
+#
+# This does not change the upstream images' behavior — each Dockerfile is a
+# 1-layer FROM + LABEL rehost. Bump the version in the matrix below to track
+# upstream releases.
+name: Build mirrored images (n8n, oauth2-proxy) + push + sign
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'containers/n8n/Dockerfile'
+      - 'containers/oauth2-proxy/Dockerfile'
+      - '.github/workflows/build-mirror-images.yml'
+  workflow_dispatch:
+    inputs:
+      n8n_version:
+        description: 'n8n upstream version to rehost'
+        default: '1.69.0'
+        required: false
+      oauth2_proxy_version:
+        description: 'oauth2-proxy upstream version to rehost'
+        default: 'v7.7.1'
+        required: false
+
+permissions:
+  id-token: write   # Azure OIDC (ACR push) + cosign keyless (Sigstore)
+  contents: read
+
+concurrency:
+  group: build-mirror-images-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build, push, sign (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      ACR_NAME: acrdsolabxsqb
+      ACR_LOGIN_SERVER: acrdsolabxsqb.azurecr.io
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: n8n
+            context: ./containers/n8n
+            image_repo: dsolab/n8n
+            version_arg: N8N_VERSION
+            default_version: '1.69.0'
+            dispatch_input: n8n_version
+          - name: oauth2-proxy
+            context: ./containers/oauth2-proxy
+            image_repo: dsolab/oauth2-proxy
+            version_arg: OAUTH2_PROXY_VERSION
+            default_version: 'v7.7.1'
+            dispatch_input: oauth2_proxy_version
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: ACR login
+        run: az acr login --name "$ACR_NAME"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Resolve upstream version + compute tags
+        id: tag
+        run: |
+          if [ "${{ matrix.name }}" = "n8n" ]; then
+            VERSION="${{ inputs.n8n_version }}"
+          else
+            VERSION="${{ inputs.oauth2_proxy_version }}"
+          fi
+          VERSION="${VERSION:-${{ matrix.default_version }}}"
+          SHA_SHORT="${GITHUB_SHA::7}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${ACR_LOGIN_SERVER}/${{ matrix.image_repo }}:${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "sha_tag=${ACR_LOGIN_SERVER}/${{ matrix.image_repo }}:${VERSION}-${SHA_SHORT}" >> "$GITHUB_OUTPUT"
+          echo "build_date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
+      - name: Build + push
+        id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          platforms: linux/amd64
+          # Two tags: upstream version (what k8s deploys) + version+sha (immutable,
+          # traceable to the exact CI run that rehosted it).
+          tags: |
+            ${{ steps.tag.outputs.tag }}
+            ${{ steps.tag.outputs.sha_tag }}
+          build-args: |
+            ${{ matrix.version_arg }}=${{ steps.tag.outputs.version }}
+            GITHUB_SHA=${{ github.sha }}
+            BUILD_DATE=${{ steps.tag.outputs.build_date }}
+
+      # ── Defender for Cloud CLI — MDVM container image scan ──────
+      # Same as build-spa.yml: uploads results so Defender's Build phase
+      # populates for these images too. Non-blocking.
+      - name: Download Defender for Cloud CLI
+        run: curl -sL -o defender "https://aka.ms/defender-cli_linux-x64" && chmod +x defender
+
+      - name: Defender CLI — scan image (MDVM)
+        continue-on-error: true
+        env:
+          DEFENDER_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          DEFENDER_CLIENT_ID: ${{ secrets.DEFENDER_CLIENT_ID }}
+          DEFENDER_CLIENT_SECRET: ${{ secrets.DEFENDER_CLIENT_SECRET }}
+        run: ./defender scan image '${{ steps.tag.outputs.sha_tag }}'
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: 'v2.4.0'
+
+      - name: Sign image (keyless via GitHub OIDC)
+        env:
+          IMAGE_DIGEST: ${{ steps.push.outputs.digest }}
+          IMAGE_TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          echo "Signing ${IMAGE_TAG}@${IMAGE_DIGEST}"
+          cosign sign --yes "${IMAGE_TAG}@${IMAGE_DIGEST}"
+
+      - name: Verify signature
+        env:
+          IMAGE_DIGEST: ${{ steps.push.outputs.digest }}
+          IMAGE_TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          cosign verify \
+            --certificate-identity-regexp "https://github.com/${{ github.repository }}/\.github/workflows/build-mirror-images\.yml.*" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            "${IMAGE_TAG}@${IMAGE_DIGEST}"
+
+      - name: Job summary
+        env:
+          IMAGE_DIGEST: ${{ steps.push.outputs.digest }}
+          IMAGE_TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          {
+            echo "## ${{ matrix.name }} rehost summary"
+            echo ""
+            echo "| Field | Value |"
+            echo "|---|---|"
+            echo "| Image (tag)    | \`${IMAGE_TAG}\` |"
+            echo "| Digest         | \`${IMAGE_DIGEST}\` |"
+            echo "| Signed by      | \`repo:${{ github.repository }}:ref:${{ github.ref }}\` |"
+            echo "| Issuer         | \`https://token.actions.githubusercontent.com\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
