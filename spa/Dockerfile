@@ -10,7 +10,7 @@
 #   VITE_REDIRECT_URI    — Where Entra redirects after login
 
 # ── Stage 1: build ─────────────────────────────────────────
-FROM node:22-alpine AS builder
+FROM node:26-alpine AS builder
 WORKDIR /app
 
 # Install deps separately so layer caches when source changes but deps don't.
