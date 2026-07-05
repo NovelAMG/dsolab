@@ -41,7 +41,7 @@ RUN npm run build
 # Pinning to a stale build on a still-supported branch gives real, trackable
 # HIGH/CRITICAL findings without hitting that scanner blind spot.
 # Not for production use — see ADR for the rehost/patch policy.
-FROM nginx:1.27.5-alpine3.21 AS runtime
+FROM nginx:1.28.0-alpine3.21 AS runtime
 
 # OCI image annotations — read by Defender for Cloud's container-to-source
 # mapping (https://learn.microsoft.com/azure/defender-for-cloud/container-image-mapping).
