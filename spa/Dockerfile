@@ -31,17 +31,9 @@ COPY . .
 RUN npm run build
 
 # ── Stage 2: serve ─────────────────────────────────────────
-# LAB: pinned to nginx:1.27.5-alpine3.21 — built Apr 2025, never rebuilt since,
-# but Alpine 3.21 itself is still IN SUPPORT (EOL 2026-11-01, per
-# https://alpinelinux.org/releases/). This is the deliberate difference from
-# the earlier nginx:1.24-alpine pin: that image sat on Alpine 3.17, which went
-# EOL 2024-11-22 — once a distro branch is EOL, its security database (secdb)
-# stops receiving new advisories, so scanners (Trivy, MDVM) can't attribute
-# newly-discovered CVEs to it even though the packages are just as vulnerable.
-# Pinning to a stale build on a still-supported branch gives real, trackable
-# HIGH/CRITICAL findings without hitting that scanner blind spot.
-# Not for production use — see ADR for the rehost/patch policy.
-FROM nginx:1.27.5-alpine3.21 AS runtime
+# Use the current Alpine-based nginx image so OS-level security fixes are
+# picked up by rebuilds (Trivy gate blocks HIGH/CRITICAL findings).
+FROM nginx:alpine AS runtime
 
 # OCI image annotations — read by Defender for Cloud's container-to-source
 # mapping (https://learn.microsoft.com/azure/defender-for-cloud/container-image-mapping).
