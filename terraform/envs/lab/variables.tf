@@ -38,7 +38,12 @@ variable "tags" {
     # Exempts the lab from the automation that deallocates idle AKS clusters.
     # Must live here: the AKS module does not ignore_changes on tags, so any
     # apply reconciles out-of-band tags away.
-    costcontrol = "ignore"
+    #
+    # Casing is significant. A lowercase 'costcontrol = ignore' was stripped off
+    # the cluster by the PowerShell cost automation ~90 minutes after it was set
+    # (confirmed via Resource Graph resourcechanges). The recognised form is
+    # PascalCase key with 'Ignore', matching SecurityControl=Ignore elsewhere.
+    CostControl = "Ignore"
   }
 }
 
