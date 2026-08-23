@@ -12,7 +12,10 @@ resource "azurerm_key_vault" "this" {
 
   public_network_access_enabled = true # private endpoint in Phase 3
 
-  tags = var.tags
+  # MCAPS governance re-disables publicNetworkAccess on Key Vaults, which breaks
+  # tf-apply (the GitHub-hosted runner reads postgres secrets during apply).
+  # Scoped here rather than in var.tags so only this resource is exempted.
+  tags = merge(var.tags, { SecurityControl = "Ignore" })
 }
 
 # Note: Key Vault Administrator role assignments are intentionally NOT managed

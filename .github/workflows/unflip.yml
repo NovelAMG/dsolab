@@ -1,0 +1,89 @@
+name: Unflip MCAPS lab settings
+
+# MCAPS governance periodically disables publicNetworkAccess on the Terraform
+# state storage account and the Key Vault, and an idle-cost automation stops the
+# AKS cluster and the Postgres server.
+#
+# The original workaround was a CronJob (lab-ops/unflip-public-access) running
+# INSIDE the AKS cluster. That deadlocks: once the cluster is stopped the CronJob
+# stops with it, nothing re-enables public access, and tf-apply then fails at
+# `terraform init` with 403 on the state blob. That is what broke tf-apply from
+# 2026-05-24 until 2026-08-23.
+#
+# This workflow does the same job from a GitHub-hosted runner, which is outside
+# Azure and unaffected by the cluster being stopped.
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: unflip
+  cancel-in-progress: false
+
+env:
+  RG: rg-dsolab-sea
+  STORAGE: stdsolabtfstate1db4
+  KEYVAULT: kv-dsolab-sea-xsqb
+  POSTGRES: psql-dsolab-sea-xsqb
+  AKS: aks-dsolab-sea
+
+jobs:
+  unflip:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Re-enable storage public network access
+        run: |
+          az storage account update -n "$STORAGE" -g "$RG" \
+            --public-network-access Enabled \
+            --query "{name:name, pna:publicNetworkAccess}" -o table
+
+      - name: Re-enable Key Vault public network access
+        run: |
+          az keyvault update -n "$KEYVAULT" -g "$RG" \
+            --public-network-access Enabled \
+            --query "{name:name, pna:properties.publicNetworkAccess}" -o table
+
+      - name: Start Postgres if stopped
+        run: |
+          STATE=$(az postgres flexible-server show -n "$POSTGRES" -g "$RG" --query state -o tsv)
+          echo "postgres state: $STATE"
+          if [ "$STATE" != "Ready" ]; then
+            az postgres flexible-server start -n "$POSTGRES" -g "$RG" --query state -o tsv
+          fi
+
+      # The in-cluster CronJob could never do this - it is the step that breaks
+      # the deadlock.
+      - name: Start AKS if stopped
+        run: |
+          POWER=$(az aks show -g "$RG" -n "$AKS" --query powerState.code -o tsv)
+          echo "aks power state: $POWER"
+          if [ "$POWER" != "Running" ]; then
+            az aks start -g "$RG" -n "$AKS"
+          fi
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Unflip result"
+            echo ""
+            echo "| Resource | State |"
+            echo "| --- | --- |"
+            echo "| $STORAGE | $(az storage account show -n "$STORAGE" -g "$RG" --query publicNetworkAccess -o tsv) |"
+            echo "| $KEYVAULT | $(az keyvault show -n "$KEYVAULT" --query properties.publicNetworkAccess -o tsv) |"
+            echo "| $POSTGRES | $(az postgres flexible-server show -n "$POSTGRES" -g "$RG" --query state -o tsv) |"
+            echo "| $AKS | $(az aks show -g "$RG" -n "$AKS" --query powerState.code -o tsv) |"
+          } >> "$GITHUB_STEP_SUMMARY"
