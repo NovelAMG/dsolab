@@ -15,6 +15,11 @@ name: Unflip MCAPS lab settings
 
 on:
   schedule:
+    # The cost automation stops the cluster daily at ~17:08 UTC (observed
+    # 17:08:11 and 17:07:54 on consecutive days via Resource Graph). Tagging the
+    # cluster does not exempt it - the automation deletes the tag instead. So
+    # restart shortly after, and sweep every 6h to cover missed or delayed runs.
+    - cron: '30 17 * * *'
     - cron: '0 */6 * * *'
   workflow_dispatch:
 

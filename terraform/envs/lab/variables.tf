@@ -35,14 +35,11 @@ variable "tags" {
     project     = "dsolab"
     environment = "lab"
     managed_by  = "terraform"
-    # Exempts the lab from the automation that deallocates idle AKS clusters.
-    # Must live here: the AKS module does not ignore_changes on tags, so any
-    # apply reconciles out-of-band tags away.
-    #
-    # Casing is significant. A lowercase 'costcontrol = ignore' was stripped off
-    # the cluster by the PowerShell cost automation ~90 minutes after it was set
-    # (confirmed via Resource Graph resourcechanges). The recognised form is
-    # PascalCase key with 'Ignore', matching SecurityControl=Ignore elsewhere.
+    # Does NOT exempt AKS. The cost automation deletes this tag off the cluster
+    # regardless of casing (both `costcontrol=ignore` and `CostControl=Ignore`
+    # were stripped within hours, per Resource Graph resourcechanges), so the
+    # AKS module ignore_changes tags and uptime is handled by the unflip
+    # workflow instead. Kept here because it does persist on the other resources.
     CostControl = "Ignore"
   }
 }

@@ -59,6 +59,12 @@ resource "azurerm_kubernetes_cluster" "this" {
       # `az aks update --enable-defender` (Phase 3.3) so the workspace
       # association is managed there, not in TF. See ADR-0018.
       microsoft_defender,
+      # The MCAPS cost automation deletes tags off this cluster (observed
+      # stripping both `costcontrol=ignore` and `CostControl=Ignore` within
+      # hours). Reconciling them back guarantees a diff on every apply, and
+      # each managedClusters write needs rights on the Defender-linked
+      # workspace. Cluster uptime is handled by .github/workflows/unflip.yml.
+      tags,
     ]
   }
 }
