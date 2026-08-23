@@ -35,6 +35,10 @@ variable "tags" {
     project     = "dsolab"
     environment = "lab"
     managed_by  = "terraform"
+    # Exempts the lab from the automation that deallocates idle AKS clusters.
+    # Must live here: the AKS module does not ignore_changes on tags, so any
+    # apply reconciles out-of-band tags away.
+    costcontrol = "ignore"
   }
 }
 
