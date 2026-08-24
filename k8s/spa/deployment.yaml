@@ -23,13 +23,13 @@ spec:
           type: RuntimeDefault
       containers:
         - name: spa
-          # Pinned to the digest of the cosign-signed build a050341 (ADR-0017).
+          # Pinned to the digest of the cosign-signed build 316a76f (ADR-0017).
           # Required by Phase 3.7 vulnerability gate (ADR-0022): mutable :latest
           # tags can race with MDVA scan ingestion; digest makes the "this is
           # the bytes Defender scanned" assertion verifiable. CI deploy script
           # (scripts/09-deploy-spa-and-workflow.sh) substitutes the new digest
           # on each push.
-          image: acrdsolabxsqb.azurecr.io/dsolab/spa@sha256:b483faec83ee15675ad6bc7bc31be17f54e8afdfd68406b211791124d49bdfa4
+          image: acrdsolabxsqb.azurecr.io/dsolab/spa@sha256:7cb64ec1f6fd0c847dee1e7e7eb0095d4633c16a0387a11ab5aabca1dbfe88fe
           imagePullPolicy: IfNotPresent # digest is immutable; no need to re-pull
           ports:
             - name: http
