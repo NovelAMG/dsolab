@@ -47,9 +47,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Non-blocking, matching the Checkov soft-fail stance in ADR 0015 - this is
+      # an experiment and must never gate a push to main. MSDO breaks the build
+      # on its own Checkov findings (the same inherited baseline checkov.yml
+      # already soft-fails on), and its bundled eslint exits 2 on this repo's
+      # config.
       - name: Run Microsoft Security DevOps
         uses: microsoft/security-devops-action@v1
         id: msdo
+        continue-on-error: true
         with:
           categories: 'IaC,code'
 
