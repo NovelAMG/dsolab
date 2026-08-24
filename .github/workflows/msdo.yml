@@ -1,0 +1,63 @@
+name: MSDO (mapping experiment)
+
+# Time-boxed experiment, NOT the target architecture.
+#
+# Internal guidance is contradictory: the DevOps onboarding guide lists MSDO in
+# the pipeline as a prerequisite for container image mapping, while the scanner
+# roadmap has MSDO "on deprecation path" with Defender CLI as its successor.
+# We already satisfy both documented mapping options without MSDO - the GitHub
+# connectors have DefenderForDevOpsGithub enabled (Option 1) and spa/Dockerfile
+# carries org.opencontainers.image.source/.revision (Option 2) - yet the Ship
+# phase stays empty.
+#
+# So this exists to answer one question: does the Ship phase populate only when
+# MSDO has run? Whatever the result, it is evidence for asctalk@microsoft.com.
+# Delete this workflow once that question is answered - do not build on it.
+#
+# Deliberately additive: build-spa.yml keeps its Defender CLI scan, which is the
+# strategic path.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'spa/**'
+      - 'terraform/**'
+      - 'k8s/**'
+      - '.github/workflows/msdo.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+  id-token: write
+
+concurrency:
+  group: msdo-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  msdo:
+    name: Microsoft Security DevOps
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Microsoft Security DevOps
+        uses: microsoft/security-devops-action@v1
+        id: msdo
+        with:
+          categories: 'IaC,code'
+
+      # Distinct category so these findings never collide with the checkov,
+      # trivy-image or codeql uploads already in the Security tab.
+      - name: Upload MSDO SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: ${{ steps.msdo.outputs.sarifFile }}
+          category: msdo
