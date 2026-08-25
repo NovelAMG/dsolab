@@ -1,0 +1,109 @@
+# Build foundry-chat → push to ACR → Defender CLI scan → sign with cosign.
+# Mirrors build-spa.yml. No Trivy gate: this image is deliberately vulnerable,
+# so a HIGH/CRITICAL gate would block every build by design.
+
+name: Build foundry-chat + push + sign
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'foundry-fastapi-chat/**'
+      - '.github/workflows/build-foundry-chat.yml'
+  workflow_dispatch:
+
+permissions:
+  id-token: write # Azure OIDC (ACR push) + cosign keyless (Sigstore)
+  contents: read
+
+concurrency:
+  group: build-foundry-chat-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build, push, sign
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      ACR_NAME: acrdsolabxsqb
+      ACR_LOGIN_SERVER: acrdsolabxsqb.azurecr.io
+      IMAGE_REPO: dsolab/foundry-chat
+
+    outputs:
+      image-ref: ${{ steps.tag.outputs.tag }}
+      image-digest: ${{ steps.push.outputs.digest }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: ACR login
+        run: az acr login --name "$ACR_NAME"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Compute image tag
+        id: tag
+        run: |
+          SHA_SHORT="${GITHUB_SHA::7}"
+          echo "tag=${ACR_LOGIN_SERVER}/${IMAGE_REPO}:${SHA_SHORT}" >> "$GITHUB_OUTPUT"
+          echo "sha_short=${SHA_SHORT}" >> "$GITHUB_OUTPUT"
+          echo "build_date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
+      - name: Build + push
+        id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: ./foundry-fastapi-chat
+          file: ./foundry-fastapi-chat/Dockerfile
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ${{ steps.tag.outputs.tag }}
+            ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_REPO }}:latest
+          build-args: |
+            GITHUB_SHA=${{ github.sha }}
+            BUILD_DATE=${{ steps.tag.outputs.build_date }}
+
+      - name: Download Defender for Cloud CLI
+        run: curl -sL -o defender "https://aka.ms/defender-cli_linux-x64" && chmod +x defender
+
+      - name: Defender CLI — scan image (MDVM)
+        continue-on-error: true
+        env:
+          DEFENDER_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          DEFENDER_CLIENT_ID: ${{ secrets.DEFENDER_CLIENT_ID }}
+          DEFENDER_CLIENT_SECRET: ${{ secrets.DEFENDER_CLIENT_SECRET }}
+        run: ./defender scan image '${{ steps.tag.outputs.tag }}'
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: 'v2.4.0'
+
+      - name: Sign image (keyless via GitHub OIDC)
+        env:
+          IMAGE_DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          cosign sign --yes "${{ steps.tag.outputs.tag }}@${IMAGE_DIGEST}"
+
+      - name: Job summary
+        run: |
+          {
+            echo "### foundry-chat image"
+            echo ""
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Tag | \`${{ steps.tag.outputs.tag }}\` |"
+            echo "| Digest | \`${{ steps.push.outputs.digest }}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
