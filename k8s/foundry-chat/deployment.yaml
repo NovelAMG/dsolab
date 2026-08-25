@@ -1,0 +1,69 @@
+# Deliberately vulnerable FastAPI workload (39 CVEs, 1 CRITICAL).
+#
+# ClusterIP only, no ingress. Exposure is inherited through the SPA hop, which
+# is what makes the Defender attack path realistic without putting a knowingly
+# vulnerable service directly on the internet.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: foundry-chat
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: foundry-chat
+  namespace: foundry-chat
+  labels:
+    app: foundry-chat
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: foundry-chat
+  template:
+    metadata:
+      labels:
+        app: foundry-chat
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: foundry-chat
+          image: acrdsolabxsqb.azurecr.io/dsolab/foundry-chat:latest
+          ports:
+            - name: http
+              containerPort: 8000
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 300m
+              memory: 512Mi
+          env:
+            # No Foundry credentials wired yet - the app starts and serves its
+            # static console; /chat returns a ConfigError until AOAI is set.
+            - name: APP_TITLE
+              value: "Foundry Chat Console (lab)"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: foundry-chat
+  namespace: foundry-chat
+spec:
+  type: ClusterIP
+  selector:
+    app: foundry-chat
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8000

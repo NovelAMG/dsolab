@@ -42,7 +42,17 @@ spec:
   policyLastEditTime: "2026-05-25T14:00:00Z"
   vulnerabilityAssessmentGatedDeployment:
     - name: dsolab-critical-cve-block
-      action: deny
+      # audit, not deny. Two reasons:
+      #   1. Defender for Cloud > Environment settings > Security rules now owns
+      #      gated deployment rules, and the portal only shows the default
+      #      system rule (Audit / All_resources). Our hand-applied deny rule was
+      #      invisible there - real drift, and it would be silently reconciled
+      #      away once that UI starts managing this CR.
+      #   2. Audit still evaluates and emits an admission event, but admits the
+      #      pod, so the deliberately vulnerable foundry-chat workload can run
+      #      and complete the code-to-runtime attack path.
+      # Flip back to deny to demo blocking - it will block foundry-chat.
+      action: audit
       configuration:
         # Zero critical CVEs allowed in any scanned image.
         maxAllowedSeverities:
