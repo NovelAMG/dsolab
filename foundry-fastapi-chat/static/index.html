@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Foundry Chat Console</title>
+    <link rel="stylesheet" href="/assets/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="panel sidebar" aria-label="Session controls">
+        <div>
+          <p class="eyebrow">Azure AI Foundry</p>
+          <h1>Chat Console</h1>
+          <p class="summary">A small FastAPI front end for testing a secured model deployment without exposing model credentials to the browser.</p>
+        </div>
+
+        <div class="status" id="status">Checking service...</div>
+
+        <label for="systemPrompt">System prompt</label>
+        <textarea id="systemPrompt" rows="8">You are a concise security engineering assistant. Explain tradeoffs clearly and avoid speculation.</textarea>
+
+        <button id="clearBtn" type="button">Clear conversation</button>
+      </section>
+
+      <section class="panel chat" aria-label="Chat">
+        <div id="messages" class="messages"></div>
+        <form id="chatForm" class="composer">
+          <label class="sr-only" for="prompt">Message</label>
+          <textarea id="prompt" rows="3" placeholder="Ask the model about a security decision, finding, or design..." required></textarea>
+          <button id="sendBtn" type="submit">Send</button>
+        </form>
+      </section>
+    </main>
+
+    <script src="/assets/app.js" type="module"></script>
+  </body>
+</html>
