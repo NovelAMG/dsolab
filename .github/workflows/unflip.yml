@@ -12,14 +12,15 @@ name: Unflip MCAPS lab settings
 #
 # This workflow does the same job from a GitHub-hosted runner, which is outside
 # Azure and unaffected by the cluster being stopped.
+#
+# It deliberately does NOT start AKS. The cluster is left stopped overnight for
+# cost; start it by hand before a demo with:
+#   az aks start -g rg-dsolab-sea -n aks-dsolab-sea
+# Note that while it is stopped there is no runtime signal, so the Runtime phase
+# of the code-to-cloud diagram goes empty.
 
 on:
   schedule:
-    # The cost automation stops the cluster daily at ~17:08 UTC (observed
-    # 17:08:11 and 17:07:54 on consecutive days via Resource Graph). Tagging the
-    # cluster does not exempt it - the automation deletes the tag instead. So
-    # restart shortly after, and sweep every 6h to cover missed or delayed runs.
-    - cron: '30 17 * * *'
     - cron: '0 */6 * * *'
   workflow_dispatch:
 
@@ -71,14 +72,6 @@ jobs:
 
       # The in-cluster CronJob could never do this - it is the step that breaks
       # the deadlock.
-      - name: Start AKS if stopped
-        run: |
-          POWER=$(az aks show -g "$RG" -n "$AKS" --query powerState.code -o tsv)
-          echo "aks power state: $POWER"
-          if [ "$POWER" != "Running" ]; then
-            az aks start -g "$RG" -n "$AKS"
-          fi
-
       - name: Summary
         if: always()
         run: |
