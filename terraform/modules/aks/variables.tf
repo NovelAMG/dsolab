@@ -20,13 +20,15 @@ variable "system_node_count" {
 }
 
 variable "system_node_vm_size" {
-  # B4als_v2 = 4 vCPU / 8 GiB AMD burstable, ~$0.06/hr in SEA.
-  # Upgraded from B2s (2 vCPU / 4 GiB) in ADR-0018 to fit Defender sensor +
-  # anti-malware daemonset + Image Integrity headroom. AMD burstable is the
-  # cheapest tier that gives enough RAM for the 3.7+ phase stack.
+  # D4as_v5 = 4 vCPU / 16 GiB AMD general-purpose, ~$0.216/hr in SEA.
+  # Switched off B4als_v2 burstable after it hit repeated
+  # OverconstrainedAllocationRequest (fabric capacity) failures in
+  # southeastasia that left the cluster unschedulable. General-purpose Dasv5
+  # allocates reliably and gives sustained (non-throttled) vCPU for the
+  # Defender sensor + anti-malware daemonset + Image Integrity stack.
   description = "VM size for system node pool"
   type        = string
-  default     = "Standard_B4als_v2"
+  default     = "Standard_D4as_v5"
 }
 
 variable "acr_id" {
