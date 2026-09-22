@@ -1,7 +1,8 @@
 # CodeQL — Static Application Security Testing (SAST)
 #
-# Phase 2A. Analyses the SPA TypeScript source for known security
-# anti-patterns (XSS sinks, prototype pollution, hardcoded secrets,
+# Phase 2A. Analyses the SPA TypeScript source and the Python code
+# (scripts/ + foundry-fastapi-chat) for known security anti-patterns
+# (XSS sinks, prototype pollution, path traversal, hardcoded secrets,
 # insecure crypto, etc.). Findings appear in the repo's Security tab
 # under "Code scanning".
 #
@@ -14,11 +15,15 @@ on:
     branches: [main]
     paths:
       - 'spa/**'
+      - 'scripts/**'
+      - 'foundry-fastapi-chat/**'
       - '.github/workflows/codeql.yml'
   pull_request:
     branches: [main]
     paths:
       - 'spa/**'
+      - 'scripts/**'
+      - 'foundry-fastapi-chat/**'
       - '.github/workflows/codeql.yml'
   schedule:
     # Weekly Monday 02:00 UTC = catch new CodeQL queries against
@@ -45,6 +50,8 @@ jobs:
         include:
           - language: javascript-typescript
             build-mode: none   # SPA is interpreted at scan time; no build needed for CodeQL
+          - language: python
+            build-mode: none   # scripts/ + foundry-fastapi-chat app are interpreted; no build step
 
     steps:
       - name: Checkout
