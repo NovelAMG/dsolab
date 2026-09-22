@@ -33,7 +33,7 @@ jobs:
       TF_VAR_n8n_api_app_id:        ${{ vars.N8N_API_APP_ID }}
       TF_VAR_n8n_api_app_uri:       ${{ vars.N8N_API_APP_URI }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Azure login (OIDC)
         uses: azure/login@v2
